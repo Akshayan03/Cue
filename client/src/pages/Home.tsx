@@ -9,37 +9,40 @@ const Home: React.FC<HomeProps> = ({ transcriptCount }) => {
   return (
     <div className="page">
       <section className="hero">
-        <h1>Your personal meeting assistant</h1>
+        <h1>
+          Meet <span className="grad">Cue</span> — your meeting copilot
+        </h1>
         <p className="muted">
-          Record your screen and audio, transcribe live, and get an AI brief with a summary,
-          decisions, and action items — all stored privately on your machine.
+          An always-on overlay that listens to your calls, tells you what to say in real time, and
+          turns every meeting into a clean recap. Invisible to screen-share. Powered by your Claude
+          login — no API key.
         </p>
         <div className="btn-row">
-          <Link className="btn btn--primary btn--lg" to="/record">
-            ● Record a meeting
+          <Link className="btn btn--primary btn--lg" to="/live">
+            ✨ Start live copilot
           </Link>
-          <Link className="btn btn--lg" to="/library">
-            Library{transcriptCount > 0 ? ` (${transcriptCount})` : ""}
+          <Link className="btn btn--lg" to="/assistant">
+            Ask about my screen
           </Link>
         </div>
       </section>
 
       <section className="features">
         <div className="feature">
-          <h3>🎥 Screen + audio capture</h3>
-          <p className="muted">Record any tab, window, or your whole screen with system and mic audio mixed in.</p>
+          <h3>🗣️ What do I say?</h3>
+          <p className="muted">Cue hears the conversation and suggests your next line — answers, follow-ups, comebacks — on demand or automatically.</p>
         </div>
         <div className="feature">
-          <h3>📝 Live transcription</h3>
-          <p className="muted">Watch the transcript build in real time with timestamps as you talk.</p>
+          <h3>👁️ Screen-aware</h3>
+          <p className="muted">Ask about whatever's on your screen — by typing or by voice — and get a streamed answer over any app.</p>
         </div>
         <div className="feature">
-          <h3>🤖 AI briefs</h3>
-          <p className="muted">Claude turns each transcript into a summary, decisions, and owner-tagged action items.</p>
+          <h3>📝 Records &amp; recaps</h3>
+          <p className="muted">Capture screen + audio, transcribe on-device with Whisper, and get an AI brief with action items.</p>
         </div>
         <div className="feature">
-          <h3>🔒 Local-first</h3>
-          <p className="muted">Recordings and transcripts live in your browser. Nothing is uploaded except the text you summarize.</p>
+          <h3>🔒 Private by default</h3>
+          <p className="muted">Transcription runs locally and the overlay never appears in screen-share. {transcriptCount > 0 ? `${transcriptCount} meeting${transcriptCount === 1 ? "" : "s"} saved.` : ""}</p>
         </div>
       </section>
     </div>

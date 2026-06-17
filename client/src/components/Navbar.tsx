@@ -8,11 +8,14 @@ const Navbar = () => {
   return (
     <nav className="navbar">
       <NavLink to="/" className="brand">
-        <span className="brand-dot" /> TranscribAI
+        <span className="brand-dot" /> Cue
       </NavLink>
       <div className="nav-links">
         <NavLink to="/assistant" className={linkClass}>
           Assistant
+        </NavLink>
+        <NavLink to="/live" className={linkClass}>
+          Live
         </NavLink>
         <NavLink to="/record" className={linkClass}>
           Record

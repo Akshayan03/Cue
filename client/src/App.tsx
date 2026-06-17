@@ -4,6 +4,7 @@ import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Record from "./pages/Record";
 import Assistant from "./pages/Assistant";
+import Live from "./pages/Live";
 import TranscriptLibrary from "./pages/TranscriptLibrary";
 import { Transcript } from "./types";
 import { isDesktop } from "./api";
@@ -30,9 +31,9 @@ const App = () => {
       {desktop && (
         <div className="overlay-bar">
           <span className="overlay-title">
-            <span className="brand-dot" /> TranscribAI
+            <span className="brand-dot" /> Cue
           </span>
-          <span className="overlay-hint">⌘\ hide · ⌘↵ ask · ⌘⇧\ click-through</span>
+          <span className="overlay-hint">⌘\ hide · ⌘↵ ask · ⌘J what to say · ⌘⇧\ click-through</span>
           <button className="overlay-close" onClick={() => window.electron?.hide()}>
             ✕
           </button>
@@ -46,6 +47,7 @@ const App = () => {
             element={desktop ? <Navigate to="/assistant" replace /> : <Home transcriptCount={savedTranscripts.length} />}
           />
           <Route path="/assistant" element={<Assistant />} />
+          <Route path="/live" element={<Live />} />
           <Route path="/record" element={<Record setSavedTranscripts={setSavedTranscripts} />} />
           <Route
             path="/library"

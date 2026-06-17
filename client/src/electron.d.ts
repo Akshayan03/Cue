@@ -1,5 +1,7 @@
 import { MeetingBrief } from "./types";
 
+export type CoachMode = "say" | "answer" | "followup" | "objection";
+
 export interface ElectronAPI {
   isElectron: true;
   hide: () => Promise<void>;
@@ -11,6 +13,11 @@ export interface ElectronAPI {
   onAskError: (cb: (text: string) => void) => () => void;
   onAskFocus: (cb: () => void) => () => void;
   onClickThroughChanged: (cb: (on: boolean) => void) => () => void;
+  coach: (transcript: string, mode: CoachMode) => Promise<void>;
+  onCoachDelta: (cb: (text: string) => void) => () => void;
+  onCoachDone: (cb: (text: string) => void) => () => void;
+  onCoachError: (cb: (text: string) => void) => () => void;
+  onCoachTrigger: (cb: () => void) => () => void;
   summarize: (payload: { title: string; transcript: string }) => Promise<MeetingBrief>;
 }
 

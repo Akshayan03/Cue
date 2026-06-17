@@ -25,7 +25,7 @@ let clickThrough = false;
 
 // Scratch dir the CLI runs in (kept clean so it doesn't load this project's
 // CLAUDE.md / skills) and where we drop screenshots for the vision feature.
-const workDir = path.join(os.tmpdir(), "transcribai");
+const workDir = path.join(os.tmpdir(), "cue-copilot");
 fs.mkdirSync(workDir, { recursive: true });
 
 function resolveClaudeBin() {
@@ -137,6 +137,11 @@ app.whenReady().then(() => {
     win?.show();
     win?.webContents.send("ask:focus");
   });
+  // "What do I say?" — instant live suggestion during a meeting.
+  globalShortcut.register("CommandOrControl+J", () => {
+    win?.show();
+    win?.webContents.send("coach:trigger");
+  });
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -165,28 +170,18 @@ async function captureScreenshotToFile() {
   return "shot.png"; // relative to workDir (the CLI's cwd)
 }
 
-const ASK_SYSTEM =
-  "You are a discreet real-time meeting assistant overlaid on the user's screen. Give fast, concise, directly useful answers — short bullets or a short paragraph. If a screenshot is provided, ground your answer in it. Never pad.";
+// Generic streaming runner: spawns the CLI and emits `<prefix>:delta/done/error`
+// events to the renderer as text streams in.
+function streamClaude(event, prefix, { prompt, system, allowRead }) {
+  const args = [
+    "--output-format", "stream-json",
+    "--include-partial-messages",
+    "--verbose",
+    "--append-system-prompt", system,
+  ];
+  if (allowRead) args.push("--allowedTools", "Read");
 
-// ---- Streaming "ask about my screen" ----
-ipcMain.handle("ask", async (event, { question, includeScreen }) => {
-  let prompt = question?.trim() || "Look at my screen and tell me what's important right now and what I should do or say next.";
-  if (includeScreen) {
-    const rel = await captureScreenshotToFile();
-    if (rel) prompt = `A screenshot of my screen is saved at ./${rel}. Read that image first, then: ${prompt}`;
-  }
-
-  const child = spawnClaude(
-    [
-      "--output-format", "stream-json",
-      "--include-partial-messages",
-      "--verbose",
-      "--allowedTools", "Read",
-      "--append-system-prompt", ASK_SYSTEM,
-    ],
-    prompt
-  );
-
+  const child = spawnClaude(args, prompt);
   let acc = "";
   let stderr = "";
   let buf = "";
@@ -210,7 +205,7 @@ ipcMain.handle("ask", async (event, { question, includeScreen }) => {
         obj.event.delta?.type === "text_delta"
       ) {
         acc += obj.event.delta.text;
-        event.sender.send("ask:delta", obj.event.delta.text);
+        event.sender.send(`${prefix}:delta`, obj.event.delta.text);
       } else if (obj.type === "result" && typeof obj.result === "string") {
         acc = obj.result;
       }
@@ -218,12 +213,42 @@ ipcMain.handle("ask", async (event, { question, includeScreen }) => {
   });
   child.stderr.on("data", (d) => (stderr += d.toString()));
   child.on("error", (err) =>
-    event.sender.send("ask:error", `Couldn't run the Claude CLI (${CLAUDE_BIN}). Is Claude Code installed and logged in? ${err.message}`)
+    event.sender.send(`${prefix}:error`, `Couldn't run the Claude CLI (${CLAUDE_BIN}). Is Claude Code installed and logged in? ${err.message}`)
   );
   child.on("close", (code) => {
-    if (code === 0 || acc) event.sender.send("ask:done", acc);
-    else event.sender.send("ask:error", stderr.trim() || `Claude exited with code ${code}.`);
+    if (code === 0 || acc) event.sender.send(`${prefix}:done`, acc);
+    else event.sender.send(`${prefix}:error`, stderr.trim() || `Claude exited with code ${code}.`);
   });
+}
+
+const ASK_SYSTEM =
+  "You are a discreet real-time meeting assistant overlaid on the user's screen. Give fast, concise, directly useful answers — short bullets or a short paragraph. If a screenshot is provided, ground your answer in it. Never pad.";
+
+// ---- Streaming "ask about my screen" ----
+ipcMain.handle("ask", async (event, { question, includeScreen }) => {
+  let prompt = question?.trim() || "Look at my screen and tell me what's important right now and what I should do or say next.";
+  if (includeScreen) {
+    const rel = await captureScreenshotToFile();
+    if (rel) prompt = `A screenshot of my screen is saved at ./${rel}. Read that image first, then: ${prompt}`;
+  }
+  streamClaude(event, "ask", { prompt, system: ASK_SYSTEM, allowRead: true });
+});
+
+// ---- Live meeting copilot: suggest what to say next ----
+const COACH_SYSTEM =
+  "You are a live meeting copilot, like a teleprompter whispering in the user's ear. You are given a rolling transcript of a conversation the user is in. Your job is to help the USER respond. Output ONLY what the user should say or do next — phrased so they can speak it almost verbatim — plus at most one short '(why)' note if useful. Be specific, confident, and brief (1-4 sentences or a few bullets). If a direct question was asked to the user, answer it. If asked about facts/technical topics, give the actual answer. Never narrate the transcript back. Never add preamble like 'You could say'.";
+
+const COACH_MODES = {
+  say: "What should the user say RIGHT NOW to respond well?",
+  answer: "The user was likely just asked a question. Give the best concrete answer they should say.",
+  followup: "Suggest a sharp follow-up question or point the user should raise next.",
+  objection: "Anticipate the likely objection or pushback coming, and tell the user how to handle it.",
+};
+
+ipcMain.handle("coach", (event, { transcript, mode }) => {
+  const ask = COACH_MODES[mode] || COACH_MODES.say;
+  const prompt = `Rolling meeting transcript (most recent last):\n"""\n${transcript}\n"""\n\n${ask}`;
+  streamClaude(event, "coach", { prompt, system: COACH_SYSTEM, allowRead: false });
 });
 
 // ---- Structured meeting brief ----

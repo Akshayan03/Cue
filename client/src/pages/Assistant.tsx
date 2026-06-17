@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { isDesktop } from "../api";
+import { useTranscriber } from "../useTranscriber";
 
 const Assistant: React.FC = () => {
   const [question, setQuestion] = useState("");
@@ -10,6 +11,12 @@ const Assistant: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const desktop = isDesktop();
+
+  // Voice input: dictate the question with the local Whisper transcriber.
+  const voice = useTranscriber("english");
+  const [micOn, setMicOn] = useState(false);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const consumedRef = useRef(0);
 
   useEffect(() => {
     if (!window.electron) return;
@@ -27,6 +34,36 @@ const Assistant: React.FC = () => {
       offFocus();
     };
   }, []);
+
+  // Append newly transcribed speech into the question box as you talk.
+  useEffect(() => {
+    const segs = voice.segments;
+    if (segs.length > consumedRef.current) {
+      const added = segs.slice(consumedRef.current).map((s) => s.text).join(" ");
+      consumedRef.current = segs.length;
+      setQuestion((q) => (q ? `${q} ${added}` : added).replace(/\s+/g, " "));
+    }
+  }, [voice.segments]);
+
+  const toggleMic = async () => {
+    if (micOn) {
+      voice.stop();
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+      setMicOn(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      consumedRef.current = 0;
+      voice.reset();
+      voice.start(stream, () => 0);
+      setMicOn(true);
+    } catch {
+      setError("Couldn't access the microphone.");
+    }
+  };
 
   const ask = async () => {
     if (!window.electron) return;
@@ -70,32 +107,42 @@ const Assistant: React.FC = () => {
           ref={inputRef}
           autoFocus
           rows={2}
-          placeholder="Ask about what's on your screen…  (⌘↵ to send)"
+          placeholder="Ask about your screen, or tap the mic to speak…  (⌘↵ to send)"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={onKeyDown}
         />
         <div className="ask-controls">
-          <label className="field--check">
-            <input
-              type="checkbox"
-              checked={includeScreen}
-              onChange={(e) => setIncludeScreen(e.target.checked)}
-            />
-            <span>Include screen</span>
-          </label>
+          <div className="ask-controls-left">
+            <button
+              className={`btn mic-btn ${micOn ? "mic-btn--on" : ""}`}
+              onClick={toggleMic}
+              title="Dictate your question"
+            >
+              {micOn ? "● Listening…" : "🎤 Speak"}
+            </button>
+            <label className="field--check">
+              <input
+                type="checkbox"
+                checked={includeScreen}
+                onChange={(e) => setIncludeScreen(e.target.checked)}
+              />
+              <span>Include screen</span>
+            </label>
+          </div>
           <button className="btn btn--primary" onClick={ask} disabled={busy}>
             {busy ? "Thinking…" : "Ask"}
           </button>
         </div>
+        {micOn && voice.status === "loading" && (
+          <p className="muted small">Loading speech model… first time only.</p>
+        )}
       </div>
 
       {error && <div className="alert alert--error">{error}</div>}
 
       {(answer || busy) && (
-        <div className="answer">
-          {answer || <span className="muted">Looking at your screen…</span>}
-        </div>
+        <div className="answer">{answer || <span className="muted">Looking at your screen…</span>}</div>
       )}
     </div>
   );
