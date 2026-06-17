@@ -1,0 +1,75 @@
+# TranscribAI
+
+A Cluely-style **desktop meeting assistant**. A translucent, always-on-top overlay that:
+
+- floats over **any** app (not a browser tab),
+- toggles with a **global hotkey**,
+- is **invisible to screen-share and recording** (it won't appear when you share your screen),
+- answers questions about **what's on your screen** in real time (Claude vision, streamed),
+- records your screen + system audio, transcribes, and generates AI meeting briefs.
+
+Local-first: recordings and transcripts stay on your machine. Only the screenshot/text you
+explicitly ask about is sent to Claude.
+
+**No API key needed.** The app reaches Claude through your locally-installed **Claude Code**
+CLI, which is already signed in with your account (OAuth / subscription). Install Claude Code
+and run `claude` once to log in — that's the only auth setup.
+
+## Hotkeys
+
+| Shortcut | Action |
+|---|---|
+| `⌘ \` | Show / hide the overlay |
+| `⌘ ↵` | Show overlay and focus the "ask about my screen" box |
+| `⌘ ⇧ \` | Toggle click-through (interact with the app underneath) |
+
+## Architecture
+
+- **`electron/`** — Native shell (main + preload). Creates the transparent always-on-top,
+  content-protected overlay window, registers global hotkeys, captures the screen via
+  `desktopCapturer`, and talks to Claude by shelling out to the **Claude Code CLI** — so it
+  uses your existing OAuth login and needs no API key or separate server.
+- **`client/`** — React UI rendered inside the overlay: the screen assistant, the recorder
+  (`getDisplayMedia` + `MediaRecorder`, with system-audio loopback granted by the main process),
+  the library, playback, and export.
+- **`server/`** — *Optional.* Only used if you run the UI as a plain website in a browser
+  instead of the desktop app.
+
+## Running the desktop app
+
+```bash
+# Prereq: Claude Code installed and logged in once (`claude` then sign in).
+# No API key, no .env required.
+
+npm install                   # root (Electron)
+npm install --prefix client   # the React UI
+
+# Launch — starts the React dev server and the Electron overlay together
+npm run dev
+```
+
+Press `⌘\` to summon the overlay over whatever you're doing. To package a standalone
+`.app`, run `npm run dist`.
+
+> **Transcription** runs **fully on-device** with Whisper (via `transformers.js`) — no API key,
+> no audio ever leaves your machine. The first recording downloads a ~40 MB model from a CDN and
+> caches it; after that it's instant and offline. This works identically in the desktop app and
+> the browser. The screen-aware **assistant** uses Claude vision and works today.
+
+## How to make it even better (roadmap)
+
+These are the natural next steps, roughly in order of value:
+
+1. **Feed the live transcript into the assistant.** Transcription already runs on-device. Next,
+   stream those segments into the screen assistant so it can answer *"what did they just ask me?"*
+   in real time during a call. For higher accuracy on long meetings, swap the `whisper-tiny` model
+   for `whisper-base`/`small` (one string in `useTranscriber.ts`), or move STT to WebGPU.
+2. **Calendar integration.** Pull meeting titles/attendees from Google Calendar so briefs
+   are pre-titled and action items can be attributed to real people.
+3. **Auto-send the brief.** After a meeting, email the brief or post it to Slack/Notion.
+4. **Cloud sync + accounts.** Right now everything is per-browser. Add auth + a database
+   (and object storage for recordings) to access meetings across devices.
+5. **Chaptering & search across meetings.** Use Claude to chapter long recordings and
+   enable semantic search over all transcripts.
+6. **Live brief.** Stream the transcript to Claude during the meeting for real-time
+   suggested questions and a running action-item list.
