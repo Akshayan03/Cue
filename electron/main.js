@@ -110,7 +110,7 @@ function createWindow() {
     ? "http://localhost:3000"
     : `file://${path.join(__dirname, "..", "client", "build", "index.html")}`;
   win.loadURL(url);
-  if (isDev) win.webContents.openDevTools({ mode: "detach" });
+  // DevTools no longer auto-opens (it popped a separate window). Toggle with ⌘⌥I.
 }
 
 function toggleVisibility() {
@@ -141,6 +141,11 @@ app.whenReady().then(() => {
   globalShortcut.register("CommandOrControl+J", () => {
     win?.show();
     win?.webContents.send("coach:trigger");
+  });
+  // Manual DevTools toggle (no longer auto-opens).
+  globalShortcut.register("CommandOrControl+Alt+I", () => {
+    if (win?.webContents.isDevToolsOpened()) win.webContents.closeDevTools();
+    else win?.webContents.openDevTools({ mode: "detach" });
   });
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
