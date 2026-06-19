@@ -33,7 +33,7 @@ const App = () => {
           <span className="overlay-title">
             <span className="brand-dot" /> Cue
           </span>
-          <span className="overlay-hint">⌘\ hide · ⌘↵ ask · ⌘J what to say · ⌘⇧\ click-through</span>
+          <span className="overlay-hint">⌘J · what to say</span>
           <button className="overlay-close" onClick={() => window.electron?.hide()}>
             ✕
           </button>
