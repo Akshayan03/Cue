@@ -28,38 +28,42 @@ const App = () => {
 
   return (
     <Router>
-      {desktop && (
-        <div className="overlay-bar">
-          <span className="overlay-title">
-            <span className="brand-dot" /> Cue
-          </span>
-          <span className="overlay-hint">⌘J · what to say</span>
-          <button className="overlay-close" onClick={() => window.electron?.hide()}>
-            ✕
-          </button>
-        </div>
-      )}
-      <Navbar />
-      <main className="app-main">
-        <Routes>
-          <Route
-            path="/"
-            element={desktop ? <Navigate to="/assistant" replace /> : <Home transcriptCount={savedTranscripts.length} />}
-          />
-          <Route path="/assistant" element={<Assistant />} />
-          <Route path="/live" element={<Live />} />
-          <Route path="/record" element={<Record setSavedTranscripts={setSavedTranscripts} />} />
-          <Route
-            path="/library"
-            element={
-              <TranscriptLibrary
-                savedTranscripts={savedTranscripts}
-                setSavedTranscripts={setSavedTranscripts}
+      <div className="shell">
+        {desktop && (
+          <div className="dragbar">
+            <span className="dragbar-brand">
+              <span className="brand-dot" /> Cue
+            </span>
+            <span className="dragbar-hint">⌘J what to say · ⌘\ hide</span>
+            <button className="dragbar-close" onClick={() => window.electron?.hide()} title="Hide (⌘\)">
+              ✕
+            </button>
+          </div>
+        )}
+        <div className="body-row">
+          <Navbar />
+          <main className="app-main">
+            <Routes>
+              <Route
+                path="/"
+                element={desktop ? <Navigate to="/assistant" replace /> : <Home transcriptCount={savedTranscripts.length} />}
               />
-            }
-          />
-        </Routes>
-      </main>
+              <Route path="/assistant" element={<Assistant />} />
+              <Route path="/live" element={<Live />} />
+              <Route path="/record" element={<Record setSavedTranscripts={setSavedTranscripts} />} />
+              <Route
+                path="/library"
+                element={
+                  <TranscriptLibrary
+                    savedTranscripts={savedTranscripts}
+                    setSavedTranscripts={setSavedTranscripts}
+                  />
+                }
+              />
+            </Routes>
+          </main>
+        </div>
+      </div>
     </Router>
   );
 };
