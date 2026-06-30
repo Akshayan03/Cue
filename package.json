@@ -3,17 +3,21 @@
   "version": "1.0.0",
   "description": "Cue — a Cluely-style desktop meeting copilot: an always-on-top overlay that hears your calls, tells you what to say, answers about your screen, and stays invisible to screen-share.",
   "main": "electron/main.js",
-  "author": "",
-  "license": "ISC",
+  "author": "Akshayan",
+  "license": "MIT",
   "scripts": {
     "dev": "concurrently -k \"BROWSER=none npm start --prefix client\" \"wait-on http://localhost:3000 && electron .\"",
     "electron": "electron .",
     "build:client": "npm run build --prefix client",
     "dist": "npm run build:client && electron-builder",
+    "dist:mac": "npm run build:client && electron-builder --mac",
+    "dist:win": "npm run build:client && electron-builder --win",
+    "release": "npm run build:client && electron-builder --publish always",
     "start": "npm run dev"
   },
   "dependencies": {
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
@@ -24,8 +28,51 @@
   "build": {
     "appId": "com.cue.copilot",
     "productName": "Cue",
-    "files": ["electron/**/*", "client/build/**/*"],
-    "directories": { "output": "release" },
-    "mac": { "category": "public.app-category.productivity" }
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "client/build/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Cue records your microphone so it can transcribe what you say during meetings.",
+        "NSCameraUsageDescription": "Cue does not use the camera.",
+        "NSScreenCaptureUsageDescription": "Cue captures your screen so it can answer questions about what's on it and record your meetings."
+      }
+    },
+    "dmg": {
+      "title": "Cue ${version}"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Akshayan03",
+        "repo": "Cue"
+      }
+    ]
   }
 }

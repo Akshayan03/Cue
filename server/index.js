@@ -4,10 +4,28 @@ import cors from "cors";
 import Anthropic from "@anthropic-ai/sdk";
 
 const app = express();
-app.use(cors());
+
+// This server holds your ANTHROPIC_API_KEY, so don't let arbitrary web pages
+// reach it. Only allow the local dev UI origin(s); override with CORS_ORIGIN
+// (comma-separated) if you host the UI somewhere else.
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:3000,http://localhost:3001")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin(origin, cb) {
+      // Allow same-origin / curl (no Origin header) and the whitelisted origins.
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      cb(new Error("Origin not allowed by CORS"));
+    },
+  })
+);
 app.use(express.json({ limit: "5mb" }));
 
 const PORT = process.env.PORT || 3001;
+// Bind to loopback by default so the key-bearing API isn't exposed to the LAN.
+const HOST = process.env.HOST || "127.0.0.1";
 const MODEL = process.env.CLAUDE_MODEL || "claude-opus-4-8";
 
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
@@ -103,8 +121,8 @@ app.post("/api/summarize", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`TranscribAI server listening on http://localhost:${PORT} (model: ${MODEL})`);
+app.listen(PORT, HOST, () => {
+  console.log(`Cue server listening on http://${HOST}:${PORT} (model: ${MODEL})`);
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn("⚠️  ANTHROPIC_API_KEY is not set — /api/summarize will return an error until you add it to server/.env");
   }

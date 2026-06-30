@@ -1,11 +1,22 @@
 import { Transcript } from "./types";
 
-const TRANSCRIPTS_KEY = "transcribai.transcripts";
+const TRANSCRIPTS_KEY = "cue.transcripts";
+const LEGACY_TRANSCRIPTS_KEY = "transcribai.transcripts"; // pre-rebrand key
 
 /** Transcript metadata + text + brief live in localStorage (small, synchronous). */
 export function loadTranscripts(): Transcript[] {
   try {
-    const raw = localStorage.getItem(TRANSCRIPTS_KEY);
+    let raw = localStorage.getItem(TRANSCRIPTS_KEY);
+    // One-time migration from the old "transcribai" key so existing users keep
+    // their saved meetings after the rebrand to Cue.
+    if (raw === null) {
+      const legacy = localStorage.getItem(LEGACY_TRANSCRIPTS_KEY);
+      if (legacy !== null) {
+        localStorage.setItem(TRANSCRIPTS_KEY, legacy);
+        localStorage.removeItem(LEGACY_TRANSCRIPTS_KEY);
+        raw = legacy;
+      }
+    }
     return raw ? (JSON.parse(raw) as Transcript[]) : [];
   } catch {
     return [];

@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Record from "./pages/Record";
 import Assistant from "./pages/Assistant";
 import Live from "./pages/Live";
+import Settings from "./pages/Settings";
 import TranscriptLibrary from "./pages/TranscriptLibrary";
 import { Transcript } from "./types";
 import { isDesktop } from "./api";
@@ -50,6 +51,7 @@ const App = () => {
               />
               <Route path="/assistant" element={<Assistant />} />
               <Route path="/live" element={<Live />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/record" element={<Record setSavedTranscripts={setSavedTranscripts} />} />
               <Route
                 path="/library"
