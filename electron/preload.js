@@ -63,4 +63,8 @@ contextBridge.exposeInMainWorld("electron", {
 
   // Structured meeting brief
   summarize: (payload) => ipcRenderer.invoke("summarize", payload),
+
+  // Provider settings (CLI vs. own API key) + onboarding status
+  getSettings: () => ipcRenderer.invoke("settings:get"),
+  setSettings: (payload) => ipcRenderer.invoke("settings:set", payload),
 });

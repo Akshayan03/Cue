@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { isDesktop } from "../api";
 import { useTranscriber } from "../useTranscriber";
 import { CoachMode } from "../electron";
+import ProviderNotice from "../components/ProviderNotice";
 
 const MODES: { mode: CoachMode; label: string; hint: string }[] = [
   { mode: "say", label: "What do I say?", hint: "Suggest my next line" },
@@ -167,6 +168,7 @@ const Live: React.FC = () => {
 
   return (
     <div className="page live">
+      <ProviderNotice />
       <div className="live-head">
         <div>
           <h1>Live copilot</h1>

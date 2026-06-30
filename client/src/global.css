@@ -286,6 +286,22 @@ input:focus, textarea:focus, select:focus {
 /* ===== Alerts ===== */
 .alert { padding: 0.7rem 0.9rem; border-radius: var(--r-sm); margin-bottom: 1rem; font-size: 0.88rem; }
 .alert--error { background: rgba(255, 93, 108, 0.1); border: 1px solid rgba(255, 93, 108, 0.45); color: #ffb3ba; }
+.alert--warn { background: rgba(255, 196, 0, 0.08); border: 1px solid rgba(255, 196, 0, 0.4); color: #ffd98a; }
+.alert--warn a { color: var(--accent-2); }
+.alert--ok { background: rgba(95, 208, 255, 0.08); border: 1px solid rgba(95, 208, 255, 0.4); color: #aee7ff; }
+
+/* ===== Settings / provider setup ===== */
+.card-title { font-size: 1rem; margin: 0 0 0.9rem; }
+.provider-opt { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.7rem 0; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); cursor: pointer; }
+.provider-opt:first-of-type { border-top: none; }
+.provider-opt input { margin-top: 0.2rem; accent-color: var(--accent); }
+.provider-opt .block { display: block; margin-top: 0.2rem; line-height: 1.45; }
+.provider-opt .ok { color: var(--accent-2); }
+.provider-opt .warn { color: #ffd98a; }
+.api-fields { display: flex; flex-direction: column; gap: 0.6rem; margin: 0.4rem 0 0.2rem 1.9rem; }
+.text-input { width: 100%; padding: 0.6rem 0.7rem; border-radius: var(--r-sm); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: var(--text); font-size: 0.9rem; }
+.text-input:focus { outline: none; border-color: var(--accent); }
+.settings-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
 
 /* ===== Hero (Home / web) ===== */
 .hero { text-align: center; padding: 3rem 0 2.2rem; }

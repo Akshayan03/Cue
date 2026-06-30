@@ -19,6 +19,11 @@
                img-src 'self' data: blob:;
                media-src 'self' blob:;
                font-src 'self' data:;
+               object-src 'none';
+               base-uri 'self';
+               form-action 'none';
+               frame-src 'none';
+               frame-ancestors 'none';
                connect-src 'self' http://localhost:3001 ws://localhost:3000 https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co;"
     />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />

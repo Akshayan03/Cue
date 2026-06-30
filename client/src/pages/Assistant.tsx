@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { isDesktop } from "../api";
 import { useTranscriber } from "../useTranscriber";
+import ProviderNotice from "../components/ProviderNotice";
 
 const Assistant: React.FC = () => {
   const [question, setQuestion] = useState("");
@@ -102,6 +103,7 @@ const Assistant: React.FC = () => {
 
   return (
     <div className="page assistant">
+      <ProviderNotice />
       <div className="ask-box">
         <textarea
           ref={inputRef}

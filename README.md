@@ -11,9 +11,23 @@ A Cluely-style **desktop meeting assistant**. A translucent, always-on-top overl
 Local-first: recordings and transcripts stay on your machine. Only the screenshot/text you
 explicitly ask about is sent to Claude.
 
-**No API key needed.** The app reaches Claude through your locally-installed **Claude Code**
-CLI, which is already signed in with your account (OAuth / subscription). Install Claude Code
-and run `claude` once to log in — that's the only auth setup.
+### Connecting to Claude — two options
+
+Cue reaches Claude one of two ways; pick either in **Settings** (the gear in the app):
+
+1. **Claude Code CLI** — if you already have [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+   installed and signed in (`claude` once to log in), Cue uses it. No API key, no separate cost
+   beyond your Claude subscription.
+2. **Your own Anthropic API key** — paste a key from
+   [console.anthropic.com](https://console.anthropic.com/settings/keys). It's stored **encrypted
+   on your device** via the OS keychain and is sent only to Anthropic, never to any Cue server.
+
+**Nothing is bundled** — there's no shared/built-in API key. On first launch, Cue detects whether
+the CLI is present and walks you through whichever option you choose.
+
+> ⚖️ **Before you record anyone, read [`TERMS.md`](./TERMS.md) and [`PRIVACY.md`](./PRIVACY.md).**
+> Recording meetings can be subject to all-party-consent (wiretapping) laws. You are responsible
+> for obtaining any consent required where you are. Cue is provided "as is" with no warranty.
 
 ## Hotkeys
 
@@ -52,10 +66,10 @@ Press `⌘\` to summon the overlay over whatever you're doing.
 
 ## Packaging & releasing (downloadable app)
 
-> **Requirement for end users:** Cue talks to Claude through the locally-installed
-> **Claude Code CLI**, signed in with the user's own account. Anyone who downloads
-> Cue must have Claude Code installed and have run `claude` to log in once. There is
-> no bundled API key.
+> **Requirement for end users:** Cue needs one of two things to reach Claude — either the
+> **Claude Code CLI** signed in with the user's own account, **or** the user's own
+> **Anthropic API key** (entered in Settings). There is no bundled API key, so each user
+> brings their own access. The app guides them through this on first launch.
 
 Build installers locally:
 
