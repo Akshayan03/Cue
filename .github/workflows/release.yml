@@ -28,8 +28,11 @@ jobs:
       - name: Install root deps
         run: npm install
 
+      # The client is a yarn project (yarn.lock). Installing it with npm resolves
+      # a fresh, broken tree (React 19 vs. CRA's ajv/peer expectations); yarn with
+      # the committed lockfile installs the known-good versions.
       - name: Install client deps
-        run: npm install --prefix client
+        run: yarn --cwd client install --frozen-lockfile
 
       - name: Build and publish
         env:

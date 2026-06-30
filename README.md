@@ -56,7 +56,7 @@ the CLI is present and walks you through whichever option you choose.
 # No API key, no .env required.
 
 npm install                   # root (Electron)
-npm install --prefix client   # the React UI
+yarn --cwd client install     # the React UI (client is a yarn project)
 
 # Launch — starts the React dev server and the Electron overlay together
 npm run dev
@@ -75,7 +75,7 @@ Build installers locally:
 
 ```bash
 npm install
-npm install --prefix client
+yarn --cwd client install
 npm run dist        # current platform → release/
 npm run dist:mac    # macOS .dmg + .zip
 npm run dist:win    # Windows .exe (NSIS)
