@@ -4,9 +4,9 @@ node_modules/
 
 # Builds / output
 client/build/
-build/
 release/
 dist/
+# NOTE: /build holds electron-builder resources (icon, entitlements) and IS tracked.
 
 # Env & secrets
 .env

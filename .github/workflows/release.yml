@@ -1,0 +1,46 @@
+name: Release
+
+# Build installable artifacts and publish them to a GitHub Release whenever a
+# version tag (e.g. v1.0.0) is pushed. The published files (.dmg / .zip / .exe
+# plus the latest*.yml manifests) are what auto-update reads, and what you link
+# to from a download page.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install root deps
+        run: npm install
+
+      - name: Install client deps
+        run: npm install --prefix client
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # --- macOS code signing + notarization (optional but recommended) ---
+          # Add these as repo secrets to ship a signed, notarized .app. Without
+          # them the build still succeeds but produces an unsigned app that
+          # macOS Gatekeeper will warn about.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run release

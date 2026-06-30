@@ -1,4 +1,4 @@
-# TranscribAI
+# Cue
 
 A Cluely-style **desktop meeting assistant**. A translucent, always-on-top overlay that:
 
@@ -48,8 +48,52 @@ npm install --prefix client   # the React UI
 npm run dev
 ```
 
-Press `⌘\` to summon the overlay over whatever you're doing. To package a standalone
-`.app`, run `npm run dist`.
+Press `⌘\` to summon the overlay over whatever you're doing.
+
+## Packaging & releasing (downloadable app)
+
+> **Requirement for end users:** Cue talks to Claude through the locally-installed
+> **Claude Code CLI**, signed in with the user's own account. Anyone who downloads
+> Cue must have Claude Code installed and have run `claude` to log in once. There is
+> no bundled API key.
+
+Build installers locally:
+
+```bash
+npm install
+npm install --prefix client
+npm run dist        # current platform → release/
+npm run dist:mac    # macOS .dmg + .zip
+npm run dist:win    # Windows .exe (NSIS)
+```
+
+Output lands in `release/`. App icon, entitlements, and per-OS metadata live in `build/`.
+
+### Code signing & notarization (do this before public distribution)
+
+Unsigned builds work locally, but macOS Gatekeeper shows *"Cue is damaged / from an
+unidentified developer"* and Windows SmartScreen warns. To ship trusted downloads:
+
+- **macOS:** an Apple Developer ID certificate ($99/yr). Set `CSC_LINK`,
+  `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`
+  in your environment (or as GitHub secrets) and electron-builder signs + notarizes
+  automatically. The hardened-runtime entitlements in `build/entitlements.mac.plist`
+  are already configured for Electron + microphone capture.
+- **Windows:** a code-signing certificate (`CSC_LINK` / `CSC_KEY_PASSWORD`).
+
+### Automated releases + auto-update
+
+`.github/workflows/release.yml` builds macOS and Windows artifacts and publishes them
+to a GitHub Release whenever you push a version tag:
+
+```bash
+npm version patch        # bumps version, creates the tag
+git push --follow-tags
+```
+
+The app checks that GitHub Release for updates on launch (via `electron-updater`) and
+notifies the user when a new version is available. Link your download page at the
+published `.dmg` / `.exe` assets.
 
 > **Transcription** runs **fully on-device** with Whisper (via `transformers.js`) — no API key,
 > no audio ever leaves your machine. The first recording downloads a ~40 MB model from a CDN and
