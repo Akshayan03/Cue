@@ -55,6 +55,16 @@ export function useTranscriber(language: string) {
         setStatus("error");
       }
     };
+    // Surface load/parse failures (e.g. the worker script or the model CDN is
+    // unreachable) instead of hanging forever on "loading model…".
+    worker.onerror = (e: ErrorEvent) => {
+      setError(
+        e.message ||
+          "The transcription engine failed to load. Check your internet connection (the speech model downloads on first use) and try again."
+      );
+      setStatus("error");
+      setPending(0);
+    };
     workerRef.current = worker;
     return worker;
   }, []);

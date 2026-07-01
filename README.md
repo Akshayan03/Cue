@@ -1,15 +1,26 @@
 # Cue
 
-A Cluely-style **desktop meeting assistant**. A translucent, always-on-top overlay that:
+**Your AI meeting copilot.** A translucent, always-on-top overlay that:
 
 - floats over **any** app (not a browser tab),
 - toggles with a **global hotkey**,
 - is **invisible to screen-share and recording** (it won't appear when you share your screen),
+- listens to your meeting and tells you **what to say next** (`⌘J`),
 - answers questions about **what's on your screen** in real time (Claude vision, streamed),
-- records your screen + system audio, transcribes, and generates AI meeting briefs.
+- records your screen + system audio, transcribes **on-device**, and generates AI meeting briefs.
 
 Local-first: recordings and transcripts stay on your machine. Only the screenshot/text you
 explicitly ask about is sent to Claude.
+
+## Download
+
+**[⬇ Download the latest release for macOS & Windows](https://github.com/Akshayan03/Cue/releases/latest)**
+
+- **macOS:** download the `.zip` for your chip (`arm64` = Apple Silicon, plain = Intel), unzip,
+  and drag **Cue.app** to Applications. The build isn't notarized yet, so the first launch needs
+  **right-click → Open** (or `System Settings → Privacy & Security → Open Anyway`).
+- **Windows:** run `Cue-Setup-<version>.exe`. SmartScreen may warn (unsigned) — choose
+  *More info → Run anyway*.
 
 ### Connecting to Claude — two options
 
@@ -34,6 +45,7 @@ the CLI is present and walks you through whichever option you choose.
 | Shortcut | Action |
 |---|---|
 | `⌘ \` | Show / hide the overlay |
+| `⌘ J` | **What do I say?** — instant live suggestion during a meeting |
 | `⌘ ↵` | Show overlay and focus the "ask about my screen" box |
 | `⌘ ⇧ \` | Toggle click-through (interact with the app underneath) |
 
@@ -41,8 +53,9 @@ the CLI is present and walks you through whichever option you choose.
 
 - **`electron/`** — Native shell (main + preload). Creates the transparent always-on-top,
   content-protected overlay window, registers global hotkeys, captures the screen via
-  `desktopCapturer`, and talks to Claude by shelling out to the **Claude Code CLI** — so it
-  uses your existing OAuth login and needs no API key or separate server.
+  `desktopCapturer`, and talks to Claude via the provider you pick in Settings — the
+  **Claude Code CLI** (your existing login) or **your own Anthropic API key** (stored
+  encrypted via the OS keychain). No separate server.
 - **`client/`** — React UI rendered inside the overlay: the screen assistant, the recorder
   (`getDisplayMedia` + `MediaRecorder`, with system-audio loopback granted by the main process),
   the library, playback, and export.
@@ -77,7 +90,7 @@ Build installers locally:
 npm install
 yarn --cwd client install
 npm run dist        # current platform → release/
-npm run dist:mac    # macOS .dmg + .zip
+npm run dist:mac    # macOS .zip (arm64 + x64)
 npm run dist:win    # Windows .exe (NSIS)
 ```
 
@@ -107,7 +120,7 @@ git push --follow-tags
 
 The app checks that GitHub Release for updates on launch (via `electron-updater`) and
 notifies the user when a new version is available. Link your download page at the
-published `.dmg` / `.exe` assets.
+published `.zip` / `.exe` assets.
 
 > **Transcription** runs **fully on-device** with Whisper (via `transformers.js`) — no API key,
 > no audio ever leaves your machine. The first recording downloads a ~40 MB model from a CDN and
