@@ -25,7 +25,7 @@ const Home: React.FC<HomeProps> = ({ transcriptCount }) => {
           {desktop ? (
             <>
               <Link className="btn btn--primary btn--lg" to="/live">
-                ✨ Start live copilot
+                Start live copilot
               </Link>
               <Link className="btn btn--lg" to="/assistant">
                 Ask about my screen
@@ -34,7 +34,7 @@ const Home: React.FC<HomeProps> = ({ transcriptCount }) => {
           ) : (
             <>
               <a className="btn btn--primary btn--lg" href={RELEASES_URL} target="_blank" rel="noreferrer">
-                ⬇ Download for Mac &amp; Windows
+                Download for Mac &amp; Windows
               </a>
               <a className="btn btn--lg" href="https://github.com/Akshayan03/Cue" target="_blank" rel="noreferrer">
                 View on GitHub
@@ -52,19 +52,19 @@ const Home: React.FC<HomeProps> = ({ transcriptCount }) => {
 
       <section className="features">
         <div className="feature">
-          <h3>🗣️ What do I say?</h3>
+          <h3>What do I say?</h3>
           <p className="muted">Cue hears the conversation and suggests your next line — answers, follow-ups, comebacks — on demand or automatically.</p>
         </div>
         <div className="feature">
-          <h3>👁️ Screen-aware</h3>
+          <h3>Screen-aware</h3>
           <p className="muted">Ask about whatever's on your screen — by typing or by voice — and get a streamed answer over any app.</p>
         </div>
         <div className="feature">
-          <h3>📝 Records &amp; recaps</h3>
+          <h3>Records &amp; recaps</h3>
           <p className="muted">Capture screen + audio, transcribe on-device with Whisper, and get an AI brief with action items.</p>
         </div>
         <div className="feature">
-          <h3>🔒 Private by default</h3>
+          <h3>Private by default</h3>
           <p className="muted">Transcription runs locally and the overlay never appears in screen-share. {transcriptCount > 0 ? `${transcriptCount} meeting${transcriptCount === 1 ? "" : "s"} saved.` : ""}</p>
         </div>
       </section>

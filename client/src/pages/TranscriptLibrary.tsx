@@ -240,7 +240,7 @@ const TranscriptLibrary: React.FC<Props> = ({ savedTranscripts, setSavedTranscri
               </div>
               <p className="muted small">
                 {new Date(t.date).toLocaleDateString()} · {fmtDuration(t.durationSec)}
-                {t.hasRecording ? " · 🎥" : ""}
+                {t.hasRecording ? " · video" : ""}
               </p>
               <p className="snippet">{t.content.slice(0, 120) || "No transcript"}</p>
             </button>

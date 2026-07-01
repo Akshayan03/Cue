@@ -6,9 +6,9 @@ import ProviderNotice from "../components/ProviderNotice";
 
 const MODES: { mode: CoachMode; label: string; hint: string }[] = [
   { mode: "say", label: "What do I say?", hint: "Suggest my next line" },
-  { mode: "answer", label: "Answer the question", hint: "They just asked me something" },
+  { mode: "answer", label: "Answer", hint: "They just asked me something" },
   { mode: "followup", label: "Follow-up", hint: "A sharp question to ask" },
-  { mode: "objection", label: "Handle pushback", hint: "Prep for the objection" },
+  { mode: "objection", label: "Pushback", hint: "Prep for the objection" },
 ];
 
 const Live: React.FC = () => {
@@ -166,63 +166,87 @@ const Live: React.FC = () => {
     );
   }
 
+  const status = !active
+    ? "Not listening"
+    : transcriber.status === "loading"
+    ? "Loading speech model…"
+    : transcriber.pending > 0
+    ? "Listening · transcribing…"
+    : "Listening";
+
   return (
     <div className="page live">
       <ProviderNotice />
-      <div className="live-head">
-        <div>
-          <h1>Live copilot</h1>
-          <p className="muted small">
-            {active ? "Listening to your meeting" : "Start to capture the conversation"}
-            {transcriber.status === "loading" && " · loading model…"}
-            {transcriber.pending > 0 && " · transcribing…"}
-          </p>
-        </div>
+
+      <div className="live-strip">
+        {active && <span className="pulse-dot" />}
+        <span className="status">{status}</span>
+        <span className="grow" />
         {!active ? (
           <button className="btn btn--primary" onClick={start}>
-            ● Start
+            Start listening
           </button>
         ) : (
           <button className="btn btn--danger" onClick={stop}>
-            ■ Stop
+            Stop
           </button>
         )}
       </div>
 
       {error && <div className="alert alert--error">{error}</div>}
 
-      <div className="suggestion-card">
-        <div className="suggestion-head">
-          <span className="badge badge--live">SUGGESTION</span>
-          {busy && <span className="muted small">thinking…</span>}
+      <div className={suggestion || busy ? "stage stage--accent" : "stage"}>
+        <div className="stage-head">
+          <span className="eyebrow">Cue says</span>
+          {busy && (
+            <span className="thinking">
+              <i />
+              <i />
+              <i />
+            </span>
+          )}
         </div>
-        <div className="suggestion-body">
+        <div className="stage-body">
           {suggestion || (
-            <span className="muted">
+            <span className="placeholder">
               {active
-                ? "Hit a button below (or ⌘J) and I'll tell you what to say."
-                : "Start listening, then ask me what to say."}
+                ? "Tap a chip below — or press ⌘J from any app — and I'll tell you what to say."
+                : "Start listening and I'll coach you through the conversation."}
             </span>
           )}
         </div>
       </div>
 
-      <div className="mode-row">
+      <div className="chip-row">
         {MODES.map((m) => (
-          <button key={m.mode} className="btn mode-btn" disabled={busy || !active} onClick={() => trigger(m.mode)} title={m.hint}>
+          <button
+            key={m.mode}
+            className="chip"
+            disabled={busy || !active}
+            onClick={() => trigger(m.mode)}
+            title={m.hint}
+          >
             {m.label}
           </button>
         ))}
       </div>
 
-      <label className="field--check auto-toggle">
-        <input type="checkbox" checked={autoMode} onChange={(e) => setAutoMode(e.target.checked)} />
-        <span>Always-on copilot — keep suggesting as the conversation moves (and auto-answer questions)</span>
-      </label>
+      <div className="switch-row mt">
+        <div>
+          <div className="switch-label">Auto-pilot</div>
+          <div className="switch-sub">Keep suggesting as the conversation moves; auto-answer questions</div>
+        </div>
+        <input
+          type="checkbox"
+          className="switch"
+          checked={autoMode}
+          onChange={(e) => setAutoMode(e.target.checked)}
+        />
+      </div>
 
-      <details className="mt">
+      <details className="plain">
         <summary>Live transcript</summary>
-        <div className="transcript-live">{fullText || <span className="muted">Listening…</span>}</div>
+        <div className="transcript-live">{fullText || <span className="faint">Listening…</span>}</div>
       </details>
     </div>
   );

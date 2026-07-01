@@ -104,47 +104,64 @@ const Assistant: React.FC = () => {
   return (
     <div className="page assistant">
       <ProviderNotice />
-      <div className="ask-box">
+      <div className="cmd">
         <textarea
           ref={inputRef}
           autoFocus
           rows={2}
-          placeholder="Ask about your screen, or tap the mic to speak…  (⌘↵ to send)"
+          placeholder="Ask about your screen…"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={onKeyDown}
         />
-        <div className="ask-controls">
-          <div className="ask-controls-left">
-            <button
-              className={`btn mic-btn ${micOn ? "mic-btn--on" : ""}`}
-              onClick={toggleMic}
-              title="Dictate your question"
-            >
-              {micOn ? "● Listening…" : "🎤 Speak"}
-            </button>
-            <label className="field--check">
-              <input
-                type="checkbox"
-                checked={includeScreen}
-                onChange={(e) => setIncludeScreen(e.target.checked)}
-              />
-              <span>Include screen</span>
-            </label>
-          </div>
-          <button className="btn btn--primary" onClick={ask} disabled={busy}>
-            {busy ? "Thinking…" : "Ask"}
-          </button>
-        </div>
+        <button
+          className={micOn ? "icon-btn icon-btn--rec" : "icon-btn"}
+          onClick={toggleMic}
+          title={micOn ? "Stop dictating" : "Dictate your question"}
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="3" width="6" height="11" rx="3" />
+            <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+          </svg>
+        </button>
+        <button className="send-btn" onClick={ask} disabled={busy} title="Ask (⌘↵)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="cmd-options">
+        <label className="field--check">
+          <input
+            type="checkbox"
+            className="switch"
+            checked={includeScreen}
+            onChange={(e) => setIncludeScreen(e.target.checked)}
+          />
+          <span className="small">Include a screenshot of my screen</span>
+        </label>
         {micOn && voice.status === "loading" && (
-          <p className="muted small">Loading speech model… first time only.</p>
+          <span className="small faint">Loading speech model…</span>
         )}
       </div>
 
       {error && <div className="alert alert--error">{error}</div>}
 
       {(answer || busy) && (
-        <div className="answer">{answer || <span className="muted">Looking at your screen…</span>}</div>
+        <div className="mt">
+          <div className="stage-head">
+            <span className="eyebrow">Answer</span>
+            {busy && !answer && (
+              <span className="thinking">
+                <i />
+                <i />
+                <i />
+              </span>
+            )}
+          </div>
+          <div className="answer">{answer || <span className="faint">Looking at your screen…</span>}</div>
+        </div>
       )}
     </div>
   );

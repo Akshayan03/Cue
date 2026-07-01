@@ -1,64 +1,63 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { isDesktop } from "../api";
 
-const Spark = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" />
-    <path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2z" />
+const Wave = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+    <path d="M3 12h1M7 9v6M11 5v14M15 8v8M19 11v2M22 12h-1" />
   </svg>
 );
-const Wave = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-    <path d="M3 12h2M7 8v8M11 4v16M15 7v10M19 10v4M21 12h0" />
+const Spark = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" />
   </svg>
 );
 const Rec = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7">
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8">
     <circle cx="12" cy="12" r="8" />
-    <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
   </svg>
 );
 const Stack = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round">
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
     <path d="M12 3l9 5-9 5-9-5 9-5z" />
     <path d="M3 13l9 5 9-5" />
   </svg>
 );
-const Gear = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-);
 
 const ITEMS = [
-  { to: "/assistant", label: "Ask", icon: <Spark /> },
   { to: "/live", label: "Live", icon: <Wave /> },
-  { to: "/record", label: "Rec", icon: <Rec /> },
+  { to: "/assistant", label: "Ask", icon: <Spark /> },
+  { to: "/record", label: "Record", icon: <Rec /> },
   { to: "/library", label: "Saved", icon: <Stack /> },
-  { to: "/settings", label: "Setup", icon: <Gear /> },
 ];
 
-const Navbar = () => {
-  const cls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "rail-btn rail-btn--active" : "rail-btn";
+/** Hotkey hint that matches the tab you're on. */
+const HINTS: Record<string, { keys: string; label: string }> = {
+  "/live": { keys: "⌘J", label: "what do I say" },
+  "/assistant": { keys: "⌘↵", label: "ask" },
+};
+
+const TabBar = () => {
+  const { pathname } = useLocation();
+  const hint = HINTS[pathname];
+  const cls = ({ isActive }: { isActive: boolean }) => (isActive ? "tab tab--active" : "tab");
 
   return (
-    <nav className="rail">
-      {!isDesktop() && (
-        <NavLink to="/" className="rail-brand" title="Cue">
-          <span className="brand-dot" />
-        </NavLink>
-      )}
+    <nav className="tabbar">
       {ITEMS.map((it) => (
-        <NavLink key={it.to} to={it.to} className={cls} title={it.label}>
-          <span className="rail-icon">{it.icon}</span>
-          <span className="rail-label">{it.label}</span>
+        <NavLink key={it.to} to={it.to} className={cls}>
+          {it.icon}
+          {it.label}
         </NavLink>
       ))}
+      {isDesktop() && hint && (
+        <span className="tabbar-hint">
+          <kbd>{hint.keys}</kbd> {hint.label}
+        </span>
+      )}
     </nav>
   );
 };
 
-export default Navbar;
+export default TabBar;

@@ -195,41 +195,44 @@ const Record: React.FC<RecordProps> = ({ setSavedTranscripts }) => {
 
   return (
     <div className="page">
-      <header className="page-head">
-        <h1>Record a meeting</h1>
-        <p className="muted">
-          Captures your screen and audio, transcribes on-device with Whisper, then turns it into an AI brief.
-        </p>
-      </header>
-
       {error && <div className="alert alert--error">{error}</div>}
       {transcriber.error && <div className="alert alert--error">Transcription: {transcriber.error}</div>}
 
       {!recording && !recordedBlob && (
-        <section className="card">
-          <div className="field-row">
-            <label className="field">
-              <span>Transcript language</span>
-              <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-                {LANGUAGES.map((l) => (
-                  <option key={l.value} value={l.value}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field field--check">
-              <input type="checkbox" checked={captureMic} onChange={(e) => setCaptureMic(e.target.checked)} />
-              <span>Also record my microphone</span>
-            </label>
+        <section>
+          <div className="switch-row">
+            <div>
+              <div className="switch-label">Transcript language</div>
+              <div className="switch-sub">Speech is transcribed on-device — audio never leaves your machine</div>
+            </div>
+            <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+              {LANGUAGES.map((l) => (
+                <option key={l.value} value={l.value}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
           </div>
-          <button className="btn btn--primary btn--lg" onClick={startRecording}>
-            ● Start recording
-          </button>
-          <p className="muted small">
-            Transcription runs locally in your browser (no audio leaves your machine). The first
-            recording downloads a small Whisper model (~40&nbsp;MB), then it's cached. When sharing a
-            tab, tick <em>"Share tab audio"</em> to capture other participants.
+          <div className="switch-row">
+            <div>
+              <div className="switch-label">Record my microphone</div>
+              <div className="switch-sub">Mix your voice into the recording and transcript</div>
+            </div>
+            <input
+              type="checkbox"
+              className="switch"
+              checked={captureMic}
+              onChange={(e) => setCaptureMic(e.target.checked)}
+            />
+          </div>
+          <div className="btn-row">
+            <button className="btn btn--primary btn--lg" onClick={startRecording}>
+              Start recording
+            </button>
+          </div>
+          <p className="small faint mt">
+            First recording downloads a small speech model (~40&nbsp;MB), then it's cached. When
+            sharing a tab, tick <em>"Share tab audio"</em> to capture other participants.
           </p>
         </section>
       )}
@@ -240,7 +243,7 @@ const Record: React.FC<RecordProps> = ({ setSavedTranscripts }) => {
             <span className="rec-dot" /> Recording
             <span className="rec-timer">{fmt(elapsed)}</span>
             <button className="btn btn--danger" onClick={stopRecording}>
-              ■ Stop
+              Stop
             </button>
           </div>
           <video ref={liveVideoRef} className="preview" autoPlay muted playsInline />
