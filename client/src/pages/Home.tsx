@@ -1,11 +1,15 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { isDesktop } from "../api";
 
 interface HomeProps {
   transcriptCount: number;
 }
 
+const RELEASES_URL = "https://github.com/Akshayan03/Cue/releases/latest";
+
 const Home: React.FC<HomeProps> = ({ transcriptCount }) => {
+  const desktop = isDesktop();
   return (
     <div className="page">
       <section className="hero">
@@ -14,17 +18,36 @@ const Home: React.FC<HomeProps> = ({ transcriptCount }) => {
         </h1>
         <p className="muted">
           An always-on overlay that listens to your calls, tells you what to say in real time, and
-          turns every meeting into a clean recap. Invisible to screen-share. Powered by your Claude
-          login — no API key.
+          turns every meeting into a clean recap. Invisible to screen-share. Bring your own Claude
+          login or Anthropic API key.
         </p>
         <div className="btn-row">
-          <Link className="btn btn--primary btn--lg" to="/live">
-            ✨ Start live copilot
-          </Link>
-          <Link className="btn btn--lg" to="/assistant">
-            Ask about my screen
-          </Link>
+          {desktop ? (
+            <>
+              <Link className="btn btn--primary btn--lg" to="/live">
+                ✨ Start live copilot
+              </Link>
+              <Link className="btn btn--lg" to="/assistant">
+                Ask about my screen
+              </Link>
+            </>
+          ) : (
+            <>
+              <a className="btn btn--primary btn--lg" href={RELEASES_URL} target="_blank" rel="noreferrer">
+                ⬇ Download for Mac &amp; Windows
+              </a>
+              <a className="btn btn--lg" href="https://github.com/Akshayan03/Cue" target="_blank" rel="noreferrer">
+                View on GitHub
+              </a>
+            </>
+          )}
         </div>
+        {!desktop && (
+          <p className="muted small">
+            Desktop app · macOS &amp; Windows · the overlay, live copilot, and screen assistant run in
+            the downloadable app.
+          </p>
+        )}
       </section>
 
       <section className="features">
