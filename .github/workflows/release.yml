@@ -34,19 +34,33 @@ jobs:
       - name: Install client deps
         run: yarn --cwd client install --frozen-lockfile
 
-      - name: Build and publish
+      # Whether a macOS signing certificate is configured. When it isn't, we must
+      # NOT pass an (empty) CSC_LINK to electron-builder — it treats the empty
+      # string as a missing cert file and fails with "<dir> not a file". So the
+      # two steps below are mutually exclusive.
+      - name: Determine signing
+        id: signing
+        shell: bash
+        run: echo "enabled=${{ secrets.CSC_LINK != '' }}" >> "$GITHUB_OUTPUT"
+
+      # Signed build — runs only once CSC_LINK (+ related) secrets are added.
+      - name: Build and publish (signed)
+        if: steps.signing.outputs.enabled == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # --- macOS code signing + notarization (optional but recommended) ---
-          # Add these as repo secrets to ship a signed, notarized .app. Without
-          # them the build produces an unsigned app that macOS Gatekeeper warns
-          # about. When no certificate is present, disable identity discovery so
-          # electron-builder does a clean ad-hoc signature instead of failing on
-          # the empty-cert path.
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run release
+
+      # Unsigned build — the default until you add a certificate. macOS Gatekeeper
+      # and Windows SmartScreen will warn users; disable identity discovery so
+      # electron-builder skips signing cleanly instead of failing.
+      - name: Build and publish (unsigned)
+        if: steps.signing.outputs.enabled != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run release
