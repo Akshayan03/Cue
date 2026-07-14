@@ -148,6 +148,11 @@ function createWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    // Real glass: blur whatever is behind the overlay. macOS renders vibrancy
+    // wherever the page is (semi-)transparent; Windows 11 uses acrylic.
+    vibrancy: "hud",
+    visualEffectState: "active",
+    backgroundMaterial: "acrylic",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
