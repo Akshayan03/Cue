@@ -387,7 +387,7 @@
 <section class="wrap rv" id="install">
   <div class="sec-kicker">// install</div>
   <h2>Unzip, open, done.</h2>
-  <p class="sec-sub">Builds aren't code-signed yet, so the first launch needs one extra click past Gatekeeper / SmartScreen. After that it opens like any other app.</p>
+  <p class="sec-sub">Builds aren't notarized by Apple yet, so macOS flags the download as "damaged" — it isn't. One Terminal command clears the quarantine flag; after that it opens like any other app.</p>
   <div class="term">
     <div class="term-bar">
       <span class="tl" style="background:#ff5f57"></span>
@@ -398,8 +398,9 @@
     <div class="term-body">
       <span class="c"># 1.</span> download the <b>.zip</b> for your chip — <b>arm64</b> = Apple Silicon, plain = Intel<br>
       <span class="c"># 2.</span> unzip → drag <b>Cue.app</b> into <b>Applications</b><br>
-      <span class="c"># 3.</span> first launch: <b>right-click → Open</b> <span class="c">(or System Settings → Privacy &amp; Security → Open Anyway)</span><br>
-      <span class="g">✓</span> press <b>⌘ \</b> — the overlay appears · grant <b>Screen Recording + Microphone</b> when asked
+      <span class="c"># 3.</span> if macOS says <b>"Cue is damaged"</b> — it isn't; clear the quarantine flag:<br>
+      <span class="y">$</span> xattr -cr /Applications/Cue.app<br>
+      <span class="g">✓</span> open Cue and press <b>⌘ \</b> · grant <b>Screen Recording + Microphone</b> when asked
     </div>
   </div>
   <div class="term">

@@ -17,8 +17,12 @@ explicitly ask about is sent to Claude.
 **[⬇ Download the latest release for macOS & Windows](https://github.com/Akshayan03/Cue/releases/latest)**
 
 - **macOS:** download the `.zip` for your chip (`arm64` = Apple Silicon, plain = Intel), unzip,
-  and drag **Cue.app** to Applications. The build isn't notarized yet, so the first launch needs
-  **right-click → Open** (or `System Settings → Privacy & Security → Open Anyway`).
+  and drag **Cue.app** to Applications. The build isn't notarized yet, so macOS will claim the
+  app is **"damaged"** — it isn't; clear the quarantine flag and it opens normally:
+
+  ```bash
+  xattr -cr /Applications/Cue.app
+  ```
 - **Windows:** run `Cue-Setup-<version>.exe`. SmartScreen may warn (unsigned) — choose
   *More info → Run anyway*.
 
