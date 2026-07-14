@@ -19,6 +19,15 @@ const Assistant: React.FC = () => {
   const micStreamRef = useRef<MediaStream | null>(null);
   const consumedRef = useRef(0);
 
+  // Release the microphone if the user navigates away mid-dictation.
+  useEffect(
+    () => () => {
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    },
+    []
+  );
+
   useEffect(() => {
     if (!window.electron) return;
     const offDelta = window.electron.onAskDelta((t) => setAnswer((a) => a + t));

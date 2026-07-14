@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cue — your invisible meeting copilot</title>
+<meta name="description" content="Cue is a translucent overlay for Mac & Windows that hears your meeting, tells you what to say next, answers about your screen — and stays invisible to screen-share.">
+<link rel="icon" type="image/png" href="icon.png">
+<style>
+  :root {
+    --bg: #08070e;
+    --text: #efeefe;
+    --muted: #928fad;
+    --faint: #5d5a75;
+    --b1: #7c6cff;
+    --b2: #b15cf0;
+    --line: rgba(170,160,255,.10);
+    --glass: rgba(160,150,255,.045);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+    line-height:1.6; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  ::selection { background: rgba(124,108,255,.35); }
+
+  /* ---------- backdrop ---------- */
+  #bg3d { position:fixed; inset:0; z-index:0; pointer-events:none; }
+  .vignette {
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background:
+      radial-gradient(ellipse 90% 55% at 50% 0%, rgba(124,108,255,.10), transparent 60%),
+      linear-gradient(180deg, transparent 0%, transparent 55%, var(--bg) 96%);
+  }
+  .grid-lines {
+    position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.5;
+    background-image:
+      linear-gradient(rgba(150,140,255,.033) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(150,140,255,.033) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 10%, black, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 10%, black, transparent 75%);
+  }
+
+  .wrap { max-width: 1020px; margin:0 auto; padding:0 28px; position:relative; z-index:2; }
+
+  /* ---------- nav ---------- */
+  nav {
+    position:sticky; top:0; z-index:50;
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    background: rgba(8,7,14,.55); border-bottom:1px solid var(--line);
+  }
+  .nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; }
+  .logo { display:flex; align-items:center; gap:10px; font-weight:650; font-size:16px; letter-spacing:-.01em; text-decoration:none; color:var(--text); }
+  .logo img { width:26px; height:26px; border-radius:7px; }
+  .nav-cta {
+    font-size:13px; font-weight:600; color:#fff; text-decoration:none;
+    padding:8px 18px; border-radius:10px;
+    background: linear-gradient(135deg, var(--b1), var(--b2));
+    box-shadow: 0 4px 18px rgba(124,108,255,.30);
+    transition: transform .15s ease;
+  }
+  .nav-cta:hover { transform: translateY(-1px); }
+
+  /* ---------- hero ---------- */
+  header { padding: 92px 0 30px; text-align:center; position:relative; }
+  .kicker {
+    font-family: var(--mono); font-size:12px; letter-spacing:.22em; color:var(--b1);
+    text-transform: uppercase; display:inline-flex; align-items:center; gap:10px;
+    padding:7px 16px; border:1px solid rgba(124,108,255,.28); border-radius:99px;
+    background: rgba(124,108,255,.07); margin-bottom:28px;
+  }
+  .kicker .dot { width:6px; height:6px; border-radius:50%; background:var(--b1); box-shadow:0 0 8px var(--b1); animation: blink 2.2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+  h1 { font-size: clamp(42px, 7vw, 74px); font-weight:700; letter-spacing:-.03em; line-height:1.05; }
+  h1 .grad {
+    background: linear-gradient(100deg, #d5cfff 0%, var(--b1) 45%, var(--b2) 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .tagline { font-size: clamp(16px, 2.2vw, 19px); color:var(--muted); margin: 22px auto 34px; max-width: 37em; }
+  .tagline b { color: var(--text); font-weight:600; }
+  .cta-row { display:flex; gap:14px; justify-content:center; align-items:center; flex-wrap:wrap; }
+  .dl-btn {
+    display:inline-flex; align-items:center; gap:10px;
+    background: linear-gradient(135deg, var(--b1), var(--b2));
+    color:#fff; text-decoration:none; font-size:16px; font-weight:600;
+    padding:15px 32px; border-radius:14px;
+    box-shadow: 0 10px 36px rgba(124,108,255,.38), inset 0 1px 0 rgba(255,255,255,.22);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(146,92,240,.5), inset 0 1px 0 rgba(255,255,255,.22); }
+  .dl-btn svg { width:17px; height:17px; }
+  .ghost-btn {
+    color:var(--muted); text-decoration:none; font-size:14px; font-weight:500;
+    padding:14px 22px; border:1px solid var(--line); border-radius:14px;
+    background: var(--glass); transition: color .15s, border-color .15s;
+  }
+  .ghost-btn:hover { color:var(--text); border-color: rgba(170,160,255,.28); }
+  .dl-meta { margin-top:16px; font-family:var(--mono); font-size:11.5px; color:var(--faint); letter-spacing:.08em; }
+
+  /* ---------- demo mock: a video call with the Cue overlay ---------- */
+  .demo-holder { padding: 52px 0 10px; perspective: 1400px; }
+  .demo {
+    position:relative; border-radius:18px; overflow:hidden;
+    border:1px solid rgba(170,160,255,.16);
+    background: linear-gradient(180deg, #0e0d17, #0b0a13);
+    box-shadow: 0 40px 120px rgba(0,0,0,.55), 0 0 90px rgba(124,108,255,.10);
+    transform: rotateX(4deg); transform-origin: 50% 0%;
+  }
+  .demo-bar { display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.02); }
+  .tl { width:11px; height:11px; border-radius:50%; opacity:.9; }
+  .url {
+    margin-left:12px; flex:1; max-width:340px; text-align:center;
+    font-family:var(--mono); font-size:11px; color:var(--faint);
+    background:rgba(255,255,255,.04); border-radius:7px; padding:4px 12px;
+  }
+  .demo-body { position:relative; height:430px; padding:24px; }
+
+  /* participant tiles */
+  .tiles { display:grid; grid-template-columns:repeat(2, 200px); gap:12px; }
+  .tile {
+    width:200px; height:124px; border-radius:12px; position:relative;
+    background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.06);
+  }
+  .tile .avatar {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-58%);
+    width:44px; height:44px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:650; font-size:15px; color:#fff;
+  }
+  .tile .nm {
+    position:absolute; left:10px; bottom:8px; font-size:10.5px; color:var(--muted);
+    background:rgba(0,0,0,.45); padding:2px 8px; border-radius:6px;
+  }
+  .tile.speaking { border-color: rgba(124,220,160,.5); box-shadow: 0 0 0 1.5px rgba(124,220,160,.35); }
+  .tile .mic { position:absolute; right:9px; bottom:8px; font-size:10px; color:#7edca0; }
+  .q-bubble {
+    margin-top:14px; max-width:404px;
+    background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:11px;
+    padding:10px 13px; font-size:12.5px; color:#cfd2ec; line-height:1.55;
+  }
+  .q-bubble .who { color:#7edca0; font-weight:600; font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; }
+
+  /* the Cue overlay panel */
+  .panel {
+    position:absolute; right:24px; top:22px; width:308px;
+    border-radius:16px; overflow:hidden;
+    background: rgba(17,16,26,.92);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border:1px solid rgba(170,160,255,.18);
+    box-shadow: 0 24px 70px rgba(0,0,0,.6);
+    font-size:12.5px;
+  }
+  .panel-head { display:flex; align-items:center; gap:7px; padding:11px 14px; border-bottom:1px solid var(--line); font-weight:600; font-size:12.5px; }
+  .panel-head .pdot { width:7px; height:7px; border-radius:50%; background:var(--b1); box-shadow:0 0 8px var(--b1); }
+  .panel-head .hint { margin-left:auto; color:var(--faint); font-family:var(--mono); font-size:9.5px; letter-spacing:.05em; }
+  .panel-body { padding:14px; min-height:158px; }
+  .eyebrow { font-family:var(--mono); font-size:9.5px; letter-spacing:.2em; color:var(--faint); text-transform:uppercase; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .live-pulse { width:6px; height:6px; border-radius:50%; background:#ff5c66; animation: blink 1.4s ease-in-out infinite; }
+  .bubble {
+    background:rgba(255,255,255,.055); border-radius:11px; padding:11px 13px;
+    color:#dcdaf5; line-height:1.6; min-height:84px; font-size:12.5px;
+  }
+  .caret { display:inline-block; width:7px; height:13px; background:var(--b1); vertical-align:-2px; margin-left:2px; animation: blink 1s steps(1) infinite; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:11px; opacity:0; transition:opacity .5s ease; }
+  .chips.show { opacity:1; }
+  .chip {
+    font-size:10.5px; font-weight:600; color:#b4aeff;
+    border:1px solid rgba(140,125,255,.4); background:rgba(140,125,255,.10);
+    padding:4px 11px; border-radius:99px;
+  }
+  .panel-foot { padding:10px 14px 12px; border-top:1px solid var(--line); }
+  .transcript-line { font-family:var(--mono); font-size:10px; color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .transcript-line b { color:#8f8bb0; font-weight:600; }
+  .via { text-align:right; font-size:9.5px; color:var(--faint); margin-top:7px; font-family:var(--mono); }
+
+  /* invisible-to-share footnote chip */
+  .ghost-note {
+    position:absolute; left:24px; bottom:22px;
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:var(--mono); font-size:10.5px; color:#a49ecf;
+    background:rgba(124,108,255,.08); border:1px dashed rgba(124,108,255,.35);
+    padding:7px 13px; border-radius:10px;
+  }
+
+  /* ---------- sections ---------- */
+  section { padding: 84px 0 0; }
+  .sec-kicker { font-family:var(--mono); font-size:11px; letter-spacing:.24em; color:var(--b1); text-transform:uppercase; margin-bottom:14px; }
+  h2 { font-size: clamp(26px, 3.6vw, 36px); font-weight:700; letter-spacing:-.02em; margin-bottom:14px; }
+  .sec-sub { color:var(--muted); max-width:42em; margin-bottom:36px; font-size:15.5px; }
+
+  .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap:14px; }
+  .card {
+    position:relative; background: var(--glass); border:1px solid var(--line);
+    border-radius:16px; padding:24px 22px; overflow:hidden;
+    transition: transform .2s ease, border-color .2s ease;
+  }
+  .card:hover { transform: translateY(-3px); border-color: rgba(150,140,255,.30); }
+  .card::before {
+    content:""; position:absolute; top:0; left:0; right:0; height:1px;
+    background: linear-gradient(90deg, transparent, rgba(150,140,255,.5), transparent);
+    opacity:0; transition:opacity .2s;
+  }
+  .card:hover::before { opacity:1; }
+  .card .ico {
+    width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(135deg, rgba(124,108,255,.18), rgba(177,92,240,.18));
+    border:1px solid rgba(150,140,255,.25); font-size:17px; margin-bottom:14px;
+  }
+  .card h3 { font-size:15.5px; font-weight:650; margin-bottom:6px; }
+  .card p { font-size:13.5px; color:var(--muted); }
+  .card kbd, .step kbd {
+    background:rgba(255,255,255,.09); border:1px solid var(--line); border-bottom-width:2px;
+    border-radius:6px; padding:1px 8px; font-family:var(--mono); font-size:12px; color:var(--text);
+  }
+
+  /* steps */
+  .steps { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:14px; }
+  .step { background:var(--glass); border:1px solid var(--line); border-radius:16px; padding:24px 22px; position:relative; }
+  .step .num { font-family:var(--mono); font-size:11px; color:var(--b1); letter-spacing:.2em; margin-bottom:10px; }
+  .step h3 { font-size:15px; font-weight:650; margin-bottom:6px; }
+  .step p { font-size:13.5px; color:var(--muted); }
+
+  /* terminal */
+  .term {
+    border-radius:14px; overflow:hidden; border:1px solid var(--line);
+    background:#0c0b15; font-family:var(--mono); font-size:13px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.4);
+  }
+  .term + .term { margin-top:14px; }
+  .term-bar { display:flex; align-items:center; gap:8px; padding:11px 15px; background:rgba(255,255,255,.03); border-bottom:1px solid var(--line); }
+  .term-title { margin-left:8px; font-size:11px; color:var(--faint); }
+  .term-body { padding:20px 22px; line-height:2.0; color:#c8c6e8; }
+  .term-body .c { color:var(--faint); }
+  .term-body .g { color:#7ee2a8; }
+  .term-body .y { color:#ffd479; }
+  .term-body b { color:#fff; font-weight:600; }
+
+  /* setup cards */
+  .two { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; }
+  .opt { background:var(--glass); border:1px solid var(--line); border-radius:16px; padding:26px 24px; }
+  .opt .tag { display:inline-block; font-family:var(--mono); font-size:10.5px; letter-spacing:.18em; color:var(--b1); border:1px solid rgba(124,108,255,.3); background:rgba(124,108,255,.08); padding:4px 12px; border-radius:99px; margin-bottom:14px; text-transform:uppercase; }
+  .opt h3 { font-size:16.5px; font-weight:650; margin-bottom:8px; }
+  .opt p { font-size:13.5px; color:var(--muted); margin-bottom:10px; }
+  .opt code { background:rgba(255,255,255,.07); border-radius:6px; padding:2px 8px; font-family:var(--mono); font-size:11.5px; color:#cac8f2; }
+  .opt a { color:#a3a0ff; }
+
+  /* privacy */
+  .priv { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .pv { display:flex; gap:12px; align-items:flex-start; background:var(--glass); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .pv .pi { color:var(--b1); font-size:16px; line-height:1.4; }
+  .pv p { font-size:13px; color:var(--muted); }
+  .pv b { color:var(--text); }
+  .consent {
+    margin-top:22px; font-size:12.5px; color:var(--faint); line-height:1.6;
+    border-left:2px solid rgba(255,196,102,.5); padding-left:14px;
+  }
+  .consent a { color:#a3a0ff; }
+
+  footer { margin-top:90px; padding:36px 0 60px; border-top:1px solid var(--line); text-align:center; font-size:12.5px; color:var(--faint); font-family:var(--mono); }
+  footer a { color:#9a96ff; text-decoration:none; }
+
+  /* reveal on scroll */
+  .rv { opacity:0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+  .rv.in { opacity:1; transform:none; }
+
+  @media (max-width: 720px) {
+    .demo { transform:none; }
+    .demo-body { height: 560px; padding:16px; }
+    .tiles { grid-template-columns:repeat(2, 1fr); }
+    .tile { width:100%; height:96px; }
+    .panel { right:12px; left:12px; width:auto; top:auto; bottom:56px; }
+    .ghost-note { left:12px; bottom:12px; font-size:9.5px; }
+    .q-bubble { font-size:11.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg3d"></canvas>
+<div class="grid-lines"></div>
+<div class="vignette"></div>
+
+<nav>
+  <div class="wrap nav-inner">
+    <a class="logo" href="#"><img src="icon.png" alt=""> Cue</a>
+    <a class="nav-cta" id="nav-dl" href="https://github.com/Akshayan03/Cue/releases/latest">Download</a>
+  </div>
+</nav>
+
+<header class="wrap">
+  <div class="kicker"><span class="dot"></span> press ⌘ \ · invisible to screen-share</div>
+  <h1>Never lost<br>for <span class="grad">words.</span></h1>
+  <p class="tagline">Cue is a translucent overlay that floats above your meeting. It <b>hears the conversation</b> and whispers back what to say — answers, follow-ups, comebacks — while staying <b>invisible to everyone you're sharing your screen with</b>.</p>
+  <div class="cta-row">
+    <a class="dl-btn" id="dl-mac" href="https://github.com/Akshayan03/Cue/releases/latest">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19.5h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Download for Mac
+    </a>
+    <a class="dl-btn" id="dl-win" href="https://github.com/Akshayan03/Cue/releases/latest" style="background:rgba(150,140,255,.12); box-shadow:none; border:1px solid rgba(150,140,255,.35);">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19.5h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Windows
+    </a>
+    <a class="ghost-btn" href="#install">Install guide ↓</a>
+  </div>
+  <div class="dl-meta" id="dl-meta">FREE · MACOS &amp; WINDOWS · APPLE SILICON &amp; INTEL</div>
+</header>
+
+<!-- animated product demo: a call, and Cue coaching over it -->
+<div class="wrap demo-holder rv">
+  <div class="demo">
+    <div class="demo-bar">
+      <span class="tl" style="background:#ff5f57"></span>
+      <span class="tl" style="background:#febc2e"></span>
+      <span class="tl" style="background:#28c840"></span>
+      <span class="url">meet.acme.com/quarterly-review</span>
+    </div>
+    <div class="demo-body">
+      <div class="tiles">
+        <div class="tile speaking">
+          <span class="avatar" style="background:linear-gradient(135deg,#3f8f6e,#2f6e56)">SK</span>
+          <span class="nm">Sarah K · Client</span><span class="mic">●</span>
+        </div>
+        <div class="tile">
+          <span class="avatar" style="background:linear-gradient(135deg,#7c6cff,#5c4fd0)">You</span>
+          <span class="nm">You</span>
+        </div>
+      </div>
+      <div class="q-bubble">
+        <span class="who">SARAH K —</span> "Walk me through why we should renew at this price when usage dropped last quarter?"
+      </div>
+
+      <!-- Cue overlay -->
+      <div class="panel">
+        <div class="panel-head"><span class="pdot"></span> Cue <span class="hint">⌘J · what do I say?</span></div>
+        <div class="panel-body">
+          <div class="eyebrow"><span class="live-pulse"></span> cue says</div>
+          <div class="bubble"><span id="typed"></span><span class="caret" id="caret"></span></div>
+          <div class="chips" id="chips">
+            <span class="chip">What do I say?</span>
+            <span class="chip">Answer</span>
+            <span class="chip">Follow-up</span>
+            <span class="chip">Pushback</span>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <div class="transcript-line"><b>live transcript ·</b> …why we should renew at this price when usage dropped…</div>
+          <div class="via">transcribed on-device · via your Claude</div>
+        </div>
+      </div>
+
+      <div class="ghost-note">◇ not visible in the shared screen</div>
+    </div>
+  </div>
+</div>
+
+<section class="wrap rv">
+  <div class="sec-kicker">// capabilities</div>
+  <h2>A teleprompter that writes itself.</h2>
+  <div class="cards">
+    <div class="card"><div class="ico">💬</div><h3>What do I say?</h3><p>Press <kbd>⌘J</kbd> mid-conversation and Cue suggests your next line from the live transcript — or auto-answers when it hears a question aimed at you.</p></div>
+    <div class="card"><div class="ico">👁</div><h3>Screen-aware answers</h3><p>Ask about whatever is on your screen — by typing or by voice — and get a streamed answer floating over any app.</p></div>
+    <div class="card"><div class="ico">🫥</div><h3>Invisible to screen-share</h3><p>Content protection keeps the overlay out of screen recordings and shared screens. Only you see it.</p></div>
+    <div class="card"><div class="ico">🎙</div><h3>On-device transcription</h3><p>Whisper runs locally — your meeting audio never leaves your machine. Works offline after a one-time ~40 MB model download.</p></div>
+    <div class="card"><div class="ico">📋</div><h3>Records &amp; recaps</h3><p>Capture screen + audio, then get an AI brief: summary, decisions, action items with owners, open questions.</p></div>
+    <div class="card"><div class="ico">🔑</div><h3>Bring your own Claude</h3><p>Use your Claude Code login or your own Anthropic API key. Nothing bundled, no Cue server, no account.</p></div>
+  </div>
+</section>
+
+<section class="wrap rv">
+  <div class="sec-kicker">// how it works</div>
+  <h2>Three keys. Zero fumbling.</h2>
+  <div class="steps">
+    <div class="step"><div class="num">01</div><h3>Summon</h3><p>Press <kbd>⌘ \</kbd> anywhere — the overlay fades in above your call, always on top, click-through when you want it.</p></div>
+    <div class="step"><div class="num">02</div><h3>Start listening</h3><p>One click and Cue transcribes the meeting on-device, keeping a rolling transcript of who said what.</p></div>
+    <div class="step"><div class="num">03</div><h3>Ask for your line</h3><p>Press <kbd>⌘J</kbd> when you're put on the spot. Cue reads the moment and hands you the words — speak it almost verbatim.</p></div>
+  </div>
+</section>
+
+<section class="wrap rv" id="install">
+  <div class="sec-kicker">// install</div>
+  <h2>Unzip, open, done.</h2>
+  <p class="sec-sub">Builds aren't code-signed yet, so the first launch needs one extra click past Gatekeeper / SmartScreen. After that it opens like any other app.</p>
+  <div class="term">
+    <div class="term-bar">
+      <span class="tl" style="background:#ff5f57"></span>
+      <span class="tl" style="background:#febc2e"></span>
+      <span class="tl" style="background:#28c840"></span>
+      <span class="term-title">macOS — install.log</span>
+    </div>
+    <div class="term-body">
+      <span class="c"># 1.</span> download the <b>.zip</b> for your chip — <b>arm64</b> = Apple Silicon, plain = Intel<br>
+      <span class="c"># 2.</span> unzip → drag <b>Cue.app</b> into <b>Applications</b><br>
+      <span class="c"># 3.</span> first launch: <b>right-click → Open</b> <span class="c">(or System Settings → Privacy &amp; Security → Open Anyway)</span><br>
+      <span class="g">✓</span> press <b>⌘ \</b> — the overlay appears · grant <b>Screen Recording + Microphone</b> when asked
+    </div>
+  </div>
+  <div class="term">
+    <div class="term-bar">
+      <span class="tl" style="background:#ff5f57"></span>
+      <span class="tl" style="background:#febc2e"></span>
+      <span class="tl" style="background:#28c840"></span>
+      <span class="term-title">windows — install.log</span>
+    </div>
+    <div class="term-body">
+      <span class="c"># 1.</span> run <b>Cue-Setup-&lt;version&gt;.exe</b><br>
+      <span class="c"># 2.</span> SmartScreen may warn → <b>More info → Run anyway</b><br>
+      <span class="g">✓</span> press <b>Ctrl \</b> to summon the overlay
+    </div>
+  </div>
+</section>
+
+<section class="wrap rv">
+  <div class="sec-kicker">// bring your own claude</div>
+  <h2>Two ways to power it.</h2>
+  <div class="two">
+    <div class="opt">
+      <span class="tag">Option A · Subscription</span>
+      <h3>Claude Code CLI</h3>
+      <p>Already pay for Claude? Install the <a href="https://docs.claude.com/en/docs/claude-code/overview">Claude Code CLI</a> and log in once:</p>
+      <p><code>npm i -g @anthropic-ai/claude-code</code> → run <code>claude</code></p>
+      <p>Cue auto-detects it. No API billing — it rides your existing subscription.</p>
+    </div>
+    <div class="opt">
+      <span class="tag">Option B · API key</span>
+      <h3>Anthropic API</h3>
+      <p>Grab a key at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a> and paste it into Cue's Settings (the gear in the overlay). Pay-per-use on your Anthropic account.</p>
+      <p>Stored <b>encrypted via your OS keychain</b> — sent only to Anthropic, never to any Cue server.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap rv">
+  <div class="sec-kicker">// privacy</div>
+  <h2>Local-first, on purpose.</h2>
+  <div class="priv">
+    <div class="pv"><span class="pi">🎙</span><p><b>Audio stays home.</b> Transcription is on-device Whisper. Recordings and transcripts live only on your machine.</p></div>
+    <div class="pv"><span class="pi">↯</span><p><b>Minimal egress.</b> Only the screenshot or transcript text you explicitly ask about is sent to Claude — nothing on a timer.</p></div>
+    <div class="pv"><span class="pi">⌗</span><p><b>Keys in the keychain.</b> Your API key is encrypted at rest by the OS and never written in plaintext.</p></div>
+    <div class="pv"><span class="pi">🫥</span><p><b>Yours alone.</b> The overlay is excluded from screen capture, so it never leaks into a share or recording.</p></div>
+  </div>
+  <p class="consent">⚖️ Recording meetings can be subject to all-party-consent laws where you live. You're responsible for getting any consent required before recording anyone — read the <a href="https://github.com/Akshayan03/Cue/blob/main/TERMS.md">Terms</a> and <a href="https://github.com/Akshayan03/Cue/blob/main/PRIVACY.md">Privacy Policy</a>.</p>
+</section>
+
+<footer>
+  <div class="wrap">
+    cue <span id="ver">v1.0.3</span> · <a href="https://github.com/Akshayan03/Cue/releases">all releases</a> · <a href="https://github.com/Akshayan03/Cue">source on github</a> · built with claude<br>
+    <span style="opacity:.65">not affiliated with anthropic · claude is a trademark of anthropic, pbc</span>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(function () {
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---- resolve real download links from the GitHub release ---- */
+  fetch("https://api.github.com/repos/Akshayan03/Cue/releases/latest")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (rel) {
+      if (!rel || !rel.assets) return;
+      var find = function (test) {
+        var a = rel.assets.find(test);
+        return a ? a.browser_download_url : null;
+      };
+      var isArm = /Mac/.test(navigator.platform) || navigator.userAgent.includes("Macintosh");
+      var macArm = find(function (a) { return /arm64-mac\.zip$/.test(a.name); });
+      var macX64 = find(function (a) { return /[0-9]-mac\.zip$/.test(a.name) && !/arm64/.test(a.name); });
+      var winExe = find(function (a) { return /\.exe$/.test(a.name); });
+      var mac = macArm || macX64;
+      if (mac) document.getElementById("dl-mac").href = mac;
+      if (winExe) document.getElementById("dl-win").href = winExe;
+      if (mac) document.getElementById("nav-dl").href = isArm ? mac : (winExe || mac);
+      var ver = rel.tag_name || "";
+      if (ver) {
+        document.getElementById("ver").textContent = ver;
+        var size = "";
+        var asset = rel.assets.find(function (a) { return /arm64-mac\.zip$/.test(a.name); });
+        if (asset) size = " · " + Math.round(asset.size / 1048576) + " MB";
+        document.getElementById("dl-meta").textContent =
+          "FREE · MACOS & WINDOWS · APPLE SILICON & INTEL · " + ver.toUpperCase() + size;
+      }
+    })
+    .catch(function () { /* keep the releases-page fallback links */ });
+
+  /* ---- typed demo suggestion ---- */
+  var messages = [
+    "Usage dipped because your team paused the EU rollout — renewals aren't priced on one quarter. Offer: renew flat, add the usage-review clause, revisit price at the EU launch.",
+    "Ask her: \"If we tie pricing to the EU go-live milestone, does the renewal work for your budget cycle?\"",
+  ];
+  var typedEl = document.getElementById("typed");
+  var chips = document.getElementById("chips");
+  if (reduced) {
+    typedEl.textContent = messages[0];
+    chips.classList.add("show");
+  } else {
+    var mi = 0, ci = 0;
+    function type() {
+      var msg = messages[mi];
+      if (ci <= msg.length) {
+        typedEl.textContent = msg.slice(0, ci);
+        ci += 1;
+        setTimeout(type, 24);
+      } else {
+        chips.classList.add("show");
+        setTimeout(function () {
+          chips.classList.remove("show");
+          ci = 0; mi = (mi + 1) % messages.length;
+          setTimeout(type, 500);
+        }, 4600);
+      }
+    }
+    setTimeout(type, 900);
+  }
+
+  /* ---- reveal on scroll ---- */
+  // A plain position sweep instead of IntersectionObserver: jump-scrolls
+  // (anchor links, End key) can skip right past a section between IO frames,
+  // leaving it permanently invisible. The sweep also reveals anything the
+  // viewport has already passed.
+  function sweep() {
+    document.querySelectorAll(".rv:not(.in)").forEach(function (el) {
+      if (el.getBoundingClientRect().top < window.innerHeight * 0.95) el.classList.add("in");
+    });
+  }
+  window.addEventListener("scroll", sweep, { passive: true });
+  window.addEventListener("resize", sweep);
+  sweep();
+
+  /* ---- three.js particle backdrop ---- */
+  if (reduced || typeof THREE === "undefined") return;
+  try {
+    var canvas = document.getElementById("bg3d");
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
+    camera.position.z = 5;
+
+    var dotTex = (function () {
+      var c = document.createElement("canvas");
+      c.width = c.height = 64;
+      var g = c.getContext("2d");
+      var grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, "rgba(255,255,255,1)");
+      grad.addColorStop(0.4, "rgba(255,255,255,.55)");
+      grad.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(c);
+    })();
+
+    var HALF_W = 9, HALF_H = 6;
+    function field(count, depthNear, depthFar, size, color, opacity) {
+      var pos = new Float32Array(count * 3);
+      for (var i = 0; i < count; i++) {
+        pos[i * 3] = (Math.random() * 2 - 1) * HALF_W;
+        pos[i * 3 + 1] = (Math.random() * 2 - 1) * HALF_H;
+        pos[i * 3 + 2] = depthNear + Math.random() * (depthFar - depthNear);
+      }
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      var mat = new THREE.PointsMaterial({
+        color: color, size: size, transparent: true, opacity: opacity,
+        map: dotTex, alphaTest: 0.01,
+        blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+      });
+      var pts = new THREE.Points(geo, mat);
+      scene.add(pts);
+      return pts;
+    }
+
+    var far = field(700, -6, -2, 0.045, 0x7c6cff, 0.55);
+    var mid = field(260, -2, 0, 0.06, 0xb15cf0, 0.45);
+    var near = field(90, 0, 1.5, 0.085, 0xcdc6ff, 0.4);
+
+    function resize() {
+      var w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    var mx = 0, my = 0;
+    window.addEventListener("pointermove", function (e) {
+      mx = (e.clientX / window.innerWidth - 0.5) * 2;
+      my = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    var t = 0;
+    (function animate() {
+      requestAnimationFrame(animate);
+      t += 0.0016;
+      far.rotation.y = t * 0.4;
+      mid.rotation.y = -t * 0.55;
+      near.rotation.y = t * 0.3;
+      camera.position.x += (mx * 0.35 - camera.position.x) * 0.03;
+      camera.position.y += (-my * 0.25 - camera.position.y) * 0.03;
+      camera.lookAt(0, 0, -2);
+      renderer.render(scene, camera);
+    })();
+  } catch (e) { /* backdrop is decorative — ignore */ }
+})();
+</script>
+</body>
+</html>

@@ -90,6 +90,7 @@ export function useTranscriber(language: string) {
     (audioStream: MediaStream, getElapsed: () => number) => {
       setError(null);
       setSegments([]);
+      setPending(0);
       offsetRef.current = 0;
       getElapsedRef.current = getElapsed;
 
@@ -142,6 +143,7 @@ export function useTranscriber(language: string) {
   const reset = useCallback(() => {
     setSegments([]);
     setError(null);
+    setPending(0);
     offsetRef.current = 0;
   }, []);
 

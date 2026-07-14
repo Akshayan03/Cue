@@ -159,11 +159,13 @@ const Record: React.FC<RecordProps> = ({ setSavedTranscripts }) => {
     if (!recordedBlob && !content) return setError("Nothing to save yet.");
 
     const id = Date.now();
+    let recordingStored = false;
     if (recordedBlob) {
       try {
         await saveRecording(id, recordedBlob);
+        recordingStored = true;
       } catch {
-        setError("Couldn't store the recording locally, but the transcript was saved.");
+        /* storage full or unavailable — keep the transcript, drop the video */
       }
     }
 
@@ -174,7 +176,7 @@ const Record: React.FC<RecordProps> = ({ setSavedTranscripts }) => {
       segments: transcriber.segments,
       date: new Date().toISOString(),
       durationSec: Math.round(elapsed),
-      hasRecording: Boolean(recordedBlob),
+      hasRecording: recordingStored,
       brief: null,
     };
     setSavedTranscripts((prev) => [transcript, ...prev]);

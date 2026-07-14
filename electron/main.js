@@ -41,9 +41,13 @@ fs.mkdirSync(workDir, { recursive: true });
 function resolveClaudeBin() {
   const candidates = [
     process.env.CLAUDE_BIN,
+    path.join(os.homedir(), ".local", "bin", "claude"), // native installer default
     path.join(os.homedir(), ".claude", "local", "claude"),
     "/opt/homebrew/bin/claude",
     "/usr/local/bin/claude",
+    // A packaged app launched from Finder gets a minimal PATH, but scan it anyway
+    // to catch npm-global and version-manager installs when launched from a shell.
+    ...(process.env.PATH || "").split(path.delimiter).filter(Boolean).map((d) => path.join(d, "claude")),
   ].filter(Boolean);
   for (const c of candidates) {
     try {

@@ -4,8 +4,9 @@
     {
       "name": "cue-client",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["start", "--prefix", "client"],
-      "port": 3000
+      "runtimeArgs": ["start", "--prefix", "/Users/akshayan7/Projects/Cue/client"],
+      "port": 3000,
+      "env": { "BROWSER": "none" }
     }
   ]
 }

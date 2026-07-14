@@ -24,7 +24,12 @@ export function loadTranscripts(): Transcript[] {
 }
 
 export function saveTranscripts(transcripts: Transcript[]): void {
-  localStorage.setItem(TRANSCRIPTS_KEY, JSON.stringify(transcripts));
+  try {
+    localStorage.setItem(TRANSCRIPTS_KEY, JSON.stringify(transcripts));
+  } catch (e) {
+    // Quota exceeded — keep the app alive; the in-memory copy is still intact.
+    console.error("Couldn't persist transcripts:", e);
+  }
 }
 
 // ---- Recording blobs (large) live in IndexedDB ----

@@ -26,6 +26,13 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
+  "jest": {
+    "moduleNameMapper": {
+      "^react-router-dom$": "react-router-dom/dist/index.js",
+      "^react-router/dom$": "react-router/dist/development/dom-export.js",
+      "^react-router$": "react-router/dist/development/index.js"
+    }
+  },
   "eslintConfig": {
     "extends": [
       "react-app",

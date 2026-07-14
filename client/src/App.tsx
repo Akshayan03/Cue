@@ -40,6 +40,19 @@ const App = () => {
     if (desktop) document.body.classList.add("overlay");
   }, [desktop]);
 
+  // Esc dismisses the overlay (unless the user is mid-typing in a field).
+  useEffect(() => {
+    if (!desktop) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (e.key === "Escape" && tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") {
+        window.electron?.hide();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [desktop]);
+
   return (
     <Router>
       <div className="shell">
