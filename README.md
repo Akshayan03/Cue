@@ -6,7 +6,8 @@
 - toggles with a **global hotkey**,
 - is **invisible to screen-share and recording** (it won't appear when you share your screen),
 - listens to your meeting and tells you **what to say next** (`⌘J`),
-- answers questions about **what's on your screen** in real time (Claude vision, streamed),
+- answers questions about your **screen, live audio, and conversation context** in one command bar,
+- surfaces **dynamic insights** and automatically answers direct questions,
 - records your screen + system audio, transcribes **on-device**, and generates AI meeting briefs.
 
 Local-first: recordings and transcripts stay on your machine. Only the screenshot/text you
@@ -51,6 +52,8 @@ the CLI is present and walks you through whichever option you choose.
 | `⌘ \` | Show / hide the overlay |
 | `⌘ J` | **What do I say?** — instant live suggestion during a meeting |
 | `⌘ ↵` | Show overlay and focus the "ask about my screen" box |
+| `⌘ R` | Clear the current session context |
+| `⌘ ←` / `⌘ →` | Move the overlay left or right |
 | `⌘ ⇧ \` | Toggle click-through (interact with the app underneath) |
 
 ## Architecture

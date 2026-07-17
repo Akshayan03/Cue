@@ -55,6 +55,11 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("coach:trigger", h);
     return () => ipcRenderer.removeListener("coach:trigger", h);
   },
+  onSessionClear: (cb) => {
+    const h = () => cb();
+    ipcRenderer.on("session:clear", h);
+    return () => ipcRenderer.removeListener("session:clear", h);
+  },
   onClickThroughChanged: (cb) => {
     const h = (_e, v) => cb(v);
     ipcRenderer.on("clickthrough:changed", h);
@@ -63,6 +68,14 @@ contextBridge.exposeInMainWorld("electron", {
 
   // Structured meeting brief
   summarize: (payload) => ipcRenderer.invoke("summarize", payload),
+
+  // Source of the on-device transcriber worker (packaged app boots it from a
+  // blob: URL because module workers can't load from the app:// scheme).
+  workerSource: () => ipcRenderer.invoke("worker:source"),
+
+  // Ensure macOS mic permission — resolves "granted" | "denied". Without it,
+  // getUserMedia returns a fake beeping track instead of the real microphone.
+  ensureMic: () => ipcRenderer.invoke("mic:ensure"),
 
   // Provider settings (CLI vs. own API key) + onboarding status
   getSettings: () => ipcRenderer.invoke("settings:get"),

@@ -11,6 +11,8 @@ const Settings: React.FC = () => {
   const [provider, setProvider] = useState<"cli" | "api">("cli");
   const [apiKey, setApiKey] = useState("");
   const [apiModel, setApiModel] = useState("claude-sonnet-5");
+  const [coachProfile, setCoachProfile] = useState<"general" | "sales" | "interview" | "coding">("general");
+  const [customInstructions, setCustomInstructions] = useState("");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +23,8 @@ const Settings: React.FC = () => {
       setSettings(s);
       setProvider(s.provider);
       setApiModel(s.apiModel || "claude-sonnet-5");
+      setCoachProfile(s.coachProfile || "general");
+      setCustomInstructions(s.customInstructions || "");
     });
   }, []);
 
@@ -43,9 +47,17 @@ const Settings: React.FC = () => {
     setError(null);
     setStatus(null);
     try {
-      const payload: { provider: "cli" | "api"; apiModel?: string; apiKey?: string } = {
+      const payload: {
+        provider: "cli" | "api";
+        apiModel?: string;
+        apiKey?: string;
+        coachProfile: "general" | "sales" | "interview" | "coding";
+        customInstructions: string;
+      } = {
         provider,
         apiModel,
+        coachProfile,
+        customInstructions,
       };
       // Only send the key field if the user typed one (avoids clobbering a saved key).
       if (provider === "api" && apiKey.trim()) payload.apiKey = apiKey.trim();
@@ -173,6 +185,43 @@ const Settings: React.FC = () => {
             </span>
           )}
         </div>
+      </div>
+
+      <div className="card">
+        <h2 className="card-title">Customize Cue</h2>
+        <p className="muted small">Tune live answers, suggested talking points, and meeting follow-ups.</p>
+        <label className="field mt">
+          <span>Copilot mode</span>
+          <select value={coachProfile} onChange={(e) => setCoachProfile(e.target.value as typeof coachProfile)}>
+            <option value="general">General meeting</option>
+            <option value="sales">Sales call</option>
+            <option value="interview">Interview</option>
+            <option value="coding">Technical / coding</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Custom instructions</span>
+          <textarea
+            rows={4}
+            maxLength={4000}
+            placeholder="Example: Keep answers under 3 bullets. Emphasize our security and enterprise deployment experience."
+            value={customInstructions}
+            onChange={(e) => setCustomInstructions(e.target.value)}
+          />
+        </label>
+        <p className="small faint">Applied locally to live coaching and screen-aware answers.</p>
+        <button className="btn btn--primary mt" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save customization"}
+        </button>
+      </div>
+
+      <div className="card shortcut-card">
+        <h2 className="card-title">Keyboard shortcuts</h2>
+        <div><span>Ask Cue</span><kbd>⌘ ↵</kbd></div>
+        <div><span>What should I say?</span><kbd>⌘ J</kbd></div>
+        <div><span>Clear session context</span><kbd>⌘ R</kbd></div>
+        <div><span>Move overlay</span><kbd>⌘ ← / →</kbd></div>
+        <div><span>Hide / show</span><kbd>⌘ \</kbd></div>
       </div>
 
       <p className="muted small">

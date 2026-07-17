@@ -61,7 +61,7 @@ const App = () => {
             <span className="wordmark">
               <span className="brand-dot" /> Cue
             </span>
-            <span className="titlebar-status">⌘\ hide</span>
+            <span className="titlebar-status"><span className="shield-dot" /> private overlay</span>
             <div className="actions">
               <NavLink
                 to="/settings"
@@ -83,7 +83,7 @@ const App = () => {
               element={desktop ? <Navigate to="/live" replace /> : <Home transcriptCount={savedTranscripts.length} />}
             />
             <Route path="/assistant" element={<Assistant />} />
-            <Route path="/live" element={<Live />} />
+            <Route path="/live" element={<Live setSavedTranscripts={setSavedTranscripts} />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/record" element={<Record setSavedTranscripts={setSavedTranscripts} />} />
             <Route

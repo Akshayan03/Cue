@@ -1,6 +1,6 @@
 {
   "name": "cue",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Cue — a desktop meeting copilot: an always-on-top overlay that hears your calls, tells you what to say, answers about your screen, and stays invisible to screen-share.",
   "main": "electron/main.js",
   "author": "Akshayan",
