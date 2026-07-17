@@ -35,7 +35,9 @@ self.onmessage = async (e) => {
         ? { chunk_length_s: 30 }
         : { chunk_length_s: 30, language: d.language, task: "transcribe" };
       const out = await asr(d.audio, opts);
-      self.postMessage({ type: "text", text: (out.text || "").trim(), t: d.t });
+      // Echo gen/final so the hook can drop stale results and know whether
+      // this pass commits the window or just refreshes the interim text.
+      self.postMessage({ type: "text", text: (out.text || "").trim(), t: d.t, gen: d.gen, final: d.final });
     }
   } catch (err) {
     self.postMessage({ type: "error", error: String(err && err.message ? err.message : err) });

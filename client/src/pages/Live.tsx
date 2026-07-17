@@ -1,106 +1,175 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { isDesktop } from "../api";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { isDesktop, summarize } from "../api";
 import { useTranscriber } from "../useTranscriber";
 import { CoachMode } from "../electron";
+import { Transcript, TranscriptSegment } from "../types";
 import ProviderNotice from "../components/ProviderNotice";
 
-const MODES: { mode: CoachMode; label: string; hint: string }[] = [
-  { mode: "say", label: "What do I say?", hint: "Suggest my next line" },
-  { mode: "answer", label: "Answer", hint: "They just asked me something" },
-  { mode: "followup", label: "Follow-up", hint: "A sharp question to ask" },
-  { mode: "objection", label: "Pushback", hint: "Prep for the objection" },
+interface LiveProps {
+  setSavedTranscripts: React.Dispatch<React.SetStateAction<Transcript[]>>;
+}
+
+const ACTIONS: { mode: CoachMode; label: string; hint: string }[] = [
+  { mode: "say", label: "What should I say?", hint: "Give me the strongest next line" },
+  { mode: "answer", label: "Answer this", hint: "Answer the question I was just asked" },
+  { mode: "followup", label: "Ask a follow-up", hint: "Surface a sharp next question" },
+  { mode: "objection", label: "Handle pushback", hint: "Prepare for the likely objection" },
 ];
 
-const Live: React.FC = () => {
+function clock(totalSec: number): string {
+  const m = Math.floor(totalSec / 60);
+  const s = Math.floor(totalSec % 60);
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+const Live: React.FC<LiveProps> = ({ setSavedTranscripts }) => {
   const desktop = isDesktop();
+  const navigate = useNavigate();
   const transcriber = useTranscriber("english");
 
   const [active, setActive] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const [suggestion, setSuggestion] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const [question, setQuestion] = useState("");
+  const [responseKind, setResponseKind] = useState<"coach" | "ask">("coach");
+  const [coachBusy, setCoachBusy] = useState(false);
+  const [askBusy, setAskBusy] = useState(false);
   const [autoMode, setAutoMode] = useState(true);
+  const [includeScreen, setIncludeScreen] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const tracksRef = useRef<MediaStreamTrack[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const timerRef = useRef<number | null>(null);
   const startTimeRef = useRef(0);
   const activeRef = useRef(false);
-  const busyRef = useRef(false);
-  const lastAutoIdxRef = useRef(0);
+  const coachBusyRef = useRef(false);
+  const lastAutoTextRef = useRef("");
   const lastSuggestLenRef = useRef(0);
   const transcriptRef = useRef("");
+  const fullTranscriptRef = useRef("");
+  const segmentsRef = useRef<TranscriptSegment[]>([]);
+  const elapsedRef = useRef(0);
+  const resetTranscriberRef = useRef(transcriber.reset);
+  resetTranscriberRef.current = transcriber.reset;
 
-  // Keep a rolling transcript string for context (last ~2000 chars).
-  const fullText = transcriber.segments.map((s) => s.text).join(" ");
-  transcriptRef.current = fullText.slice(-2000);
+  const fullText = [...transcriber.segments.map((s) => s.text), transcriber.interim]
+    .filter(Boolean)
+    .join(" ");
+  fullTranscriptRef.current = fullText;
+  transcriptRef.current = fullText.slice(-6000);
+  segmentsRef.current = transcriber.segments;
+  elapsedRef.current = elapsed;
 
-  const trigger = useCallback(
-    (mode: CoachMode) => {
-      if (!window.electron) return;
-      if (!transcriptRef.current.trim()) {
-        setError("No conversation captured yet — start listening first.");
-        return;
-      }
-      setError(null);
-      setSuggestion("");
-      setBusy(true);
-      busyRef.current = true;
-      lastSuggestLenRef.current = transcriptRef.current.length;
-      window.electron.coach(transcriptRef.current, mode);
-    },
-    []
-  );
+  const displayText = responseKind === "ask" ? answer : suggestion;
+  const displayBusy = responseKind === "ask" ? askBusy : coachBusy;
 
-  // Subscribe to streamed suggestions + the global ⌘J trigger.
+  const trigger = useCallback((mode: CoachMode) => {
+    if (!window.electron) return;
+    if (!transcriptRef.current.trim()) {
+      setError("I need a little conversation context first. Start listening and try again.");
+      return;
+    }
+    setError(null);
+    setResponseKind("coach");
+    setSuggestion("");
+    setCoachBusy(true);
+    coachBusyRef.current = true;
+    lastSuggestLenRef.current = transcriptRef.current.length;
+    window.electron.coach(transcriptRef.current, mode);
+  }, []);
+
+  const ask = useCallback(() => {
+    if (!window.electron || askBusy) return;
+    const typed = question.trim();
+    if (!typed) {
+      inputRef.current?.focus();
+      return;
+    }
+    const meetingContext = transcriptRef.current.trim();
+    const prompt = meetingContext
+      ? `${typed}\n\nUse this live meeting transcript as additional context (most recent last):\n${meetingContext}`
+      : typed;
+    setError(null);
+    setResponseKind("ask");
+    setAnswer("");
+    setAskBusy(true);
+    window.electron.ask(prompt, includeScreen);
+  }, [askBusy, includeScreen, question]);
+
   useEffect(() => {
     if (!window.electron) return;
-    const offDelta = window.electron.onCoachDelta((t) => setSuggestion((s) => s + t));
-    const offDone = window.electron.onCoachDone(() => {
-      setBusy(false);
-      busyRef.current = false;
+    const offCoachDelta = window.electron.onCoachDelta((t) => setSuggestion((s) => s + t));
+    const offCoachDone = window.electron.onCoachDone(() => {
+      setCoachBusy(false);
+      coachBusyRef.current = false;
     });
-    const offErr = window.electron.onCoachError((msg) => {
+    const offCoachError = window.electron.onCoachError((msg) => {
       setError(msg);
-      setBusy(false);
-      busyRef.current = false;
+      setCoachBusy(false);
+      coachBusyRef.current = false;
     });
-    const offTrig = window.electron.onCoachTrigger(() => {
+    const offAskDelta = window.electron.onAskDelta((t) => setAnswer((s) => s + t));
+    const offAskDone = window.electron.onAskDone(() => setAskBusy(false));
+    const offAskError = window.electron.onAskError((msg) => {
+      setError(msg);
+      setAskBusy(false);
+    });
+    const offAskFocus = window.electron.onAskFocus(() => inputRef.current?.focus());
+    const offCoachTrigger = window.electron.onCoachTrigger(() => {
       if (activeRef.current) trigger("say");
     });
+    const offClear = window.electron.onSessionClear?.(() => {
+      resetTranscriberRef.current();
+      setSuggestion("");
+      setAnswer("");
+      setQuestion("");
+      setError(null);
+      lastAutoTextRef.current = "";
+      lastSuggestLenRef.current = 0;
+    });
     return () => {
-      offDelta();
-      offDone();
-      offErr();
-      offTrig();
+      offCoachDelta();
+      offCoachDone();
+      offCoachError();
+      offAskDelta();
+      offAskDone();
+      offAskError();
+      offAskFocus();
+      offCoachTrigger();
+      offClear?.();
     };
   }, [trigger]);
 
-  // Immediate auto-answer: when the other person finishes on a question, jump on it.
   useEffect(() => {
-    if (!autoMode || busyRef.current || !activeRef.current) return;
-    const segs = transcriber.segments;
-    if (segs.length <= lastAutoIdxRef.current) return;
-    const latest = segs[segs.length - 1]?.text ?? "";
-    lastAutoIdxRef.current = segs.length;
-    if (/\?\s*$/.test(latest) || /\b(what|how|why|when|where|who|could you|can you|tell me|thoughts)\b/i.test(latest)) {
+    if (!autoMode || coachBusyRef.current || !activeRef.current) return;
+    const txt = fullText.trim();
+    if (!txt || txt === lastAutoTextRef.current) return;
+    if (/\?\s*$/.test(txt)) {
+      lastAutoTextRef.current = txt;
       trigger("answer");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transcriber.segments, autoMode]);
+  }, [fullText, autoMode, trigger]);
 
-  // Always-on copilot: every few seconds, refresh the suggestion if the
-  // conversation has moved on meaningfully since the last one.
   useEffect(() => {
     if (!autoMode || !active) return;
     const id = window.setInterval(() => {
-      if (busyRef.current) return;
+      if (coachBusyRef.current) return;
       const grew = transcriptRef.current.length - lastSuggestLenRef.current;
-      if (grew >= 60) trigger("say");
-    }, 9000);
+      if (grew >= 90) trigger("say");
+    }, 10000);
     return () => window.clearInterval(id);
   }, [autoMode, active, trigger]);
 
-  const stop = useCallback(() => {
+  useEffect(() => {
+    document.body.classList.toggle("session-active", active);
+    return () => document.body.classList.remove("session-active");
+  }, [active]);
+
+  const cleanupCapture = useCallback(() => {
     activeRef.current = false;
     setActive(false);
     transcriber.stop();
@@ -108,13 +177,56 @@ const Live: React.FC = () => {
     tracksRef.current = [];
     audioCtxRef.current?.close().catch(() => {});
     audioCtxRef.current = null;
+    if (timerRef.current !== null) window.clearInterval(timerRef.current);
+    timerRef.current = null;
   }, [transcriber]);
+
+  const endSession = useCallback(() => {
+    const content = fullTranscriptRef.current.trim();
+    const durationSec = Math.max(1, Math.round(elapsedRef.current));
+    const segments = [...segmentsRef.current];
+    const interim = transcriber.interim.trim();
+    if (interim) segments.push({ t: Math.max(0, durationSec - 1), text: interim });
+    cleanupCapture();
+
+    if (!content) return;
+    const id = Date.now();
+    const title = `Meeting · ${new Date().toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })}`;
+    const meeting: Transcript = {
+      id,
+      name: title,
+      content,
+      segments,
+      date: new Date().toISOString(),
+      durationSec,
+      hasRecording: false,
+      brief: null,
+    };
+    setSavedTranscripts((prev) => [meeting, ...prev]);
+    navigate("/library");
+
+    // Cluely-style post-call notes: save immediately, then enrich in place.
+    summarize({ title, transcript: content })
+      .then((brief) => {
+        setSavedTranscripts((prev) => prev.map((t) => (t.id === id ? { ...t, brief } : t)));
+      })
+      .catch(() => {
+        // The transcript is already safe in the library; the user can retry there.
+      });
+  }, [cleanupCapture, navigate, setSavedTranscripts, transcriber.interim]);
 
   const start = useCallback(async () => {
     setError(null);
     setSuggestion("");
+    setAnswer("");
     transcriber.reset();
-    lastAutoIdxRef.current = 0;
+    lastAutoTextRef.current = "";
+    lastSuggestLenRef.current = 0;
     try {
       const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       const tracks = [...display.getTracks()];
@@ -125,129 +237,188 @@ const Live: React.FC = () => {
         ctx.createMediaStreamSource(display).connect(dest);
         mixed = true;
       }
-      try {
-        const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-        ctx.createMediaStreamSource(mic).connect(dest);
-        tracks.push(...mic.getAudioTracks());
-        mixed = true;
-      } catch {
-        /* mic denied */
+      const micAllowed =
+        !window.electron?.ensureMic || (await window.electron.ensureMic()) === "granted";
+      if (micAllowed) {
+        try {
+          const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+          ctx.createMediaStreamSource(mic).connect(dest);
+          tracks.push(...mic.getAudioTracks());
+          mixed = true;
+        } catch {
+          /* system audio can continue without the mic */
+        }
       }
       tracksRef.current = tracks;
       audioCtxRef.current = ctx;
-      // We only need audio; stop the video track to save resources.
       display.getVideoTracks().forEach((t) => t.stop());
 
       if (!mixed) {
-        setError("No audio captured. When sharing, enable system/tab audio.");
+        setError("No audio was captured. Enable screen/system audio or microphone access, then try again.");
+        tracks.forEach((t) => t.stop());
+        ctx.close().catch(() => {});
         return;
       }
       startTimeRef.current = Date.now();
-      transcriber.start(dest.stream, () => (Date.now() - startTimeRef.current) / 1000);
+      setElapsed(0);
+      elapsedRef.current = 0;
+      timerRef.current = window.setInterval(() => {
+        const next = (Date.now() - startTimeRef.current) / 1000;
+        elapsedRef.current = next;
+        setElapsed(next);
+      }, 500);
+      await transcriber.start(dest.stream, () => (Date.now() - startTimeRef.current) / 1000);
       activeRef.current = true;
       setActive(true);
     } catch {
-      setError("Couldn't start audio capture. Grant screen-sharing permission and enable audio.");
+      setError("Couldn't start the session. Allow screen/system audio and microphone access, then try again.");
     }
   }, [transcriber]);
 
-  useEffect(() => () => stop(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(
+    () => () => {
+      activeRef.current = false;
+      tracksRef.current.forEach((t) => t.stop());
+      audioCtxRef.current?.close().catch(() => {});
+      if (timerRef.current !== null) window.clearInterval(timerRef.current);
+    },
+    []
+  );
+
+  const insight = useMemo(() => {
+    const text = fullText.trim();
+    if (!text) return "Start a session and Cue will surface questions, answers, and next steps here.";
+    if (/\?\s*$/.test(text)) return "A question just landed — answer it directly or ask Cue for a stronger response.";
+    if (/\b(price|pricing|budget|cost|expensive|concern|worry|risk)\b/i.test(text)) {
+      return "Possible objection detected — clarify the concern before defending your position.";
+    }
+    if (/\b(next step|follow up|send|deadline|by (monday|tuesday|wednesday|thursday|friday))\b/i.test(text)) {
+      return "A next step may be forming — confirm the owner and timing before the call ends.";
+    }
+    return "Conversation context is live. Cue is ready when you need the next line.";
+  }, [fullText]);
 
   if (!desktop) {
     return (
       <div className="page">
-        <header className="page-head">
-          <h1>Live copilot</h1>
-        </header>
+        <header className="page-head"><h1>Live copilot</h1></header>
         <div className="card">
-          <p>The live meeting copilot runs in the <strong>desktop app</strong>. Launch it with <code>npm run dev</code> and press <kbd>⌘\</kbd>.</p>
+          <p>The real-time meeting overlay runs in the <strong>desktop app</strong>.</p>
         </div>
       </div>
     );
   }
 
   const status = !active
-    ? "Not listening"
+    ? "Ready"
     : transcriber.status === "loading"
     ? "Loading speech model…"
-    : transcriber.pending > 0
-    ? "Listening · transcribing…"
     : "Listening";
 
   return (
-    <div className="page live">
+    <div className="page live live--session">
       <ProviderNotice />
 
-      <div className="live-strip">
-        {active && <span className="pulse-dot" />}
-        <span className="status">{status}</span>
-        <span className="grow" />
+      <div className="session-bar">
+        <span className="drag-grip" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
+        <span className={active ? "session-state session-state--live" : "session-state"}>
+          {active && <span className="pulse-dot" />}
+          {status}
+        </span>
+        <span className="session-timer">{clock(elapsed)}</span>
+        <span className="privacy-pill" title="Hidden from screen sharing and recordings">◉ Invisible</span>
         {!active ? (
-          <button className="btn btn--primary" onClick={start}>
-            Start listening
-          </button>
+          <button className="session-start" onClick={start}>Start session</button>
         ) : (
-          <button className="btn btn--danger" onClick={stop}>
-            Stop
-          </button>
+          <button className="session-end" onClick={endSession}>End</button>
         )}
       </div>
 
       {error && <div className="alert alert--error">{error}</div>}
 
-      <div className={suggestion || busy ? "stage stage--accent" : "stage"}>
-        <div className="stage-head">
-          <span className="eyebrow">Cue says</span>
-          {busy && (
-            <span className="thinking">
-              <i />
-              <i />
-              <i />
+      <section className={displayText || displayBusy ? "assist-card assist-card--active" : "assist-card"}>
+        <div className="assist-head">
+          <span className="eyebrow">{responseKind === "ask" ? "AI response" : "Live assist"}</span>
+          {(displayText || displayBusy) && (
+            <span className="context-badges">
+              {fullText && <span>Heard conversation</span>}
+              {responseKind === "ask" && includeScreen && <span>Viewed screen</span>}
             </span>
           )}
         </div>
-        <div className="stage-body">
-          {suggestion || (
-            <span className="placeholder">
-              {active
-                ? "Tap a chip below — or press ⌘J from any app — and I'll tell you what to say."
-                : "Start listening and I'll coach you through the conversation."}
-            </span>
+        <div className="assist-body">
+          {displayText || (
+            displayBusy ? (
+              <span className="thinking"><i /><i /><i /></span>
+            ) : active ? (
+              <span className="placeholder">Cue is listening. Ask anything or choose a live action below.</span>
+            ) : (
+              <span className="placeholder">Start a session to hear the conversation, answer questions, and create automatic notes.</span>
+            )
           )}
         </div>
+      </section>
+
+      <div className="live-command">
+        <input
+          ref={inputRef}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              ask();
+            }
+          }}
+          placeholder="Ask about the screen, audio, or conversation…"
+          aria-label="Ask Cue"
+        />
+        <button
+          className={includeScreen ? "context-toggle context-toggle--on" : "context-toggle"}
+          onClick={() => setIncludeScreen((v) => !v)}
+          title={includeScreen ? "Screen context on" : "Screen context off"}
+          aria-label="Toggle screen context"
+        >
+          ◫
+        </button>
+        <button className="send-btn" onClick={ask} disabled={askBusy || !question.trim()} title="Ask (⌘↵)">
+          ↑
+        </button>
       </div>
 
-      <div className="chip-row">
-        {MODES.map((m) => (
+      <div className="live-actions" aria-label="Live actions">
+        {ACTIONS.map((action, index) => (
           <button
-            key={m.mode}
-            className="chip"
-            disabled={busy || !active}
-            onClick={() => trigger(m.mode)}
-            title={m.hint}
+            key={action.mode}
+            className="action-chip"
+            disabled={coachBusy || !active}
+            onClick={() => trigger(action.mode)}
+            title={action.hint}
           >
-            {m.label}
+            {index === 0 && <span className="action-spark">✦</span>}
+            {action.label}
+            {index === 0 && <kbd>⌘J</kbd>}
           </button>
         ))}
       </div>
 
-      <div className="switch-row mt">
+      <section className="insight-card">
         <div>
-          <div className="switch-label">Auto-pilot</div>
-          <div className="switch-sub">Keep suggesting as the conversation moves; auto-answer questions</div>
+          <span className="eyebrow">Dynamic insight</span>
+          <p>{insight}</p>
         </div>
-        <input
-          type="checkbox"
-          className="switch"
-          checked={autoMode}
-          onChange={(e) => setAutoMode(e.target.checked)}
-        />
-      </div>
+        <label className="auto-control">
+          <span>Auto</span>
+          <input type="checkbox" className="switch" checked={autoMode} onChange={(e) => setAutoMode(e.target.checked)} />
+        </label>
+      </section>
 
-      <details className="plain">
-        <summary>Live transcript</summary>
-        <div className="transcript-live">{fullText || <span className="faint">Listening…</span>}</div>
+      <details className="plain transcript-drawer">
+        <summary>Live transcript <span>{fullText ? `${fullText.split(/\s+/).length} words` : ""}</span></summary>
+        <div className="transcript-live">{fullText || <span className="faint">Nothing heard yet.</span>}</div>
       </details>
+
+      {!active && fullText && <Link className="small" to="/library">Open meeting notes</Link>}
     </div>
   );
 };

@@ -17,7 +17,7 @@ const Assistant: React.FC = () => {
   const voice = useTranscriber("english");
   const [micOn, setMicOn] = useState(false);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const consumedRef = useRef(0);
+  const dictBaseRef = useRef(""); // question text present when dictation began
 
   // Release the microphone if the user navigates away mid-dictation.
   useEffect(
@@ -45,15 +45,15 @@ const Assistant: React.FC = () => {
     };
   }, []);
 
-  // Append newly transcribed speech into the question box as you talk.
+  // Live dictation: the transcriber re-transcribes the current window each
+  // pass, so REPLACE the dictated part instead of appending segments.
+  const voiceText = [...voice.segments.map((s) => s.text), voice.interim]
+    .filter(Boolean)
+    .join(" ");
   useEffect(() => {
-    const segs = voice.segments;
-    if (segs.length > consumedRef.current) {
-      const added = segs.slice(consumedRef.current).map((s) => s.text).join(" ");
-      consumedRef.current = segs.length;
-      setQuestion((q) => (q ? `${q} ${added}` : added).replace(/\s+/g, " "));
-    }
-  }, [voice.segments]);
+    if (!micOn || !voiceText) return;
+    setQuestion(`${dictBaseRef.current}${voiceText}`.replace(/\s+/g, " "));
+  }, [voiceText, micOn]);
 
   const toggleMic = async () => {
     if (micOn) {
@@ -63,10 +63,16 @@ const Assistant: React.FC = () => {
       setMicOn(false);
       return;
     }
+    if (window.electron?.ensureMic && (await window.electron.ensureMic()) !== "granted") {
+      setError(
+        "Microphone access is blocked. Enable Cue in System Settings → Privacy & Security → Microphone, then try again."
+      );
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
-      consumedRef.current = 0;
+      dictBaseRef.current = question.trim() ? `${question.trim()} ` : "";
       voice.reset();
       voice.start(stream, () => 0);
       setMicOn(true);

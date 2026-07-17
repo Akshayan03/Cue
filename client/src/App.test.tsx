@@ -4,5 +4,5 @@ import App from './App';
 
 test('renders the app navigation', () => {
   render(<App />);
-  expect(screen.getByText(/Saved/i)).toBeInTheDocument();
+  expect(screen.getByText(/Notes/i)).toBeInTheDocument();
 });

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cue — your invisible meeting copilot</title>
-<meta name="description" content="Cue is a translucent overlay for Mac & Windows that hears your meeting, tells you what to say next, answers about your screen — and stays invisible to screen-share.">
+<meta name="description" content="Cue is a private AI meeting overlay for Mac and Windows that listens live, answers from your screen and conversation, coaches you in real time, and creates automatic notes.">
 <link rel="icon" type="image/png" href="icon.png">
 <style>
   :root {
@@ -298,7 +298,7 @@
 <header class="wrap">
   <div class="kicker"><span class="dot"></span> press ⌘ \ · invisible to screen-share</div>
   <h1>Never lost<br>for <span class="grad">words.</span></h1>
-  <p class="tagline">Cue is a translucent overlay that floats above your meeting. It <b>hears the conversation</b> and whispers back what to say — answers, follow-ups, comebacks — while staying <b>invisible to everyone you're sharing your screen with</b>.</p>
+  <p class="tagline">Cue is a private meeting overlay that <b>hears the conversation</b>, understands your screen, and gives you the next answer in real time. One live HUD for coaching, questions, dynamic insights, transcripts, and automatic post-call notes.</p>
   <div class="cta-row">
     <a class="dl-btn" id="dl-mac" href="https://github.com/Akshayan03/Cue/releases/latest">
       <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19.5h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -308,6 +308,7 @@
       <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19.5h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Windows
     </a>
+    <a class="ghost-btn" id="dl-mac-intel" href="https://github.com/Akshayan03/Cue/releases/latest">Mac Intel</a>
     <a class="ghost-btn" href="#install">Install guide ↓</a>
   </div>
   <div class="dl-meta" id="dl-meta">FREE · MACOS &amp; WINDOWS · APPLE SILICON &amp; INTEL</div>
@@ -365,11 +366,13 @@
   <div class="sec-kicker">// capabilities</div>
   <h2>A teleprompter that writes itself.</h2>
   <div class="cards">
-    <div class="card"><div class="ico">💬</div><h3>What do I say?</h3><p>Press <kbd>⌘J</kbd> mid-conversation and Cue suggests your next line from the live transcript — or auto-answers when it hears a question aimed at you.</p></div>
-    <div class="card"><div class="ico">👁</div><h3>Screen-aware answers</h3><p>Ask about whatever is on your screen — by typing or by voice — and get a streamed answer floating over any app.</p></div>
-    <div class="card"><div class="ico">🫥</div><h3>Invisible to screen-share</h3><p>Content protection keeps the overlay out of screen recordings and shared screens. Only you see it.</p></div>
+    <div class="card"><div class="ico">💬</div><h3>Live answers</h3><p>Press <kbd>⌘J</kbd> mid-conversation and Cue writes the strongest next line from your live context — or answers direct questions automatically.</p></div>
+    <div class="card"><div class="ico">👁</div><h3>Screen + audio context</h3><p>Ask one command bar about your screen, live audio, or conversation and get a concise streamed response over any app.</p></div>
+    <div class="card"><div class="ico">✦</div><h3>Dynamic insights</h3><p>Cue surfaces questions, likely objections, follow-ups, and next steps as the conversation develops.</p></div>
+    <div class="card"><div class="ico">🫥</div><h3>Private overlay</h3><p>Native OS content protection excludes Cue from supported shared-screen and recording capture paths.</p></div>
     <div class="card"><div class="ico">🎙</div><h3>On-device transcription</h3><p>Whisper runs locally — your meeting audio never leaves your machine. Works offline after a one-time ~40 MB model download.</p></div>
-    <div class="card"><div class="ico">📋</div><h3>Records &amp; recaps</h3><p>Capture screen + audio, then get an AI brief: summary, decisions, action items with owners, open questions.</p></div>
+    <div class="card"><div class="ico">📋</div><h3>Automatic meeting notes</h3><p>End a session and Cue immediately saves the transcript, then creates a summary, decisions, action items, and open questions.</p></div>
+    <div class="card"><div class="ico">⚙</div><h3>Your copilot, your way</h3><p>Switch between general, sales, interview, and technical modes or add your own custom instructions.</p></div>
     <div class="card"><div class="ico">🔑</div><h3>Bring your own Claude</h3><p>Use your Claude Code login or your own Anthropic API key. Nothing bundled, no Cue server, no account.</p></div>
   </div>
 </section>
@@ -445,14 +448,14 @@
     <div class="pv"><span class="pi">🎙</span><p><b>Audio stays home.</b> Transcription is on-device Whisper. Recordings and transcripts live only on your machine.</p></div>
     <div class="pv"><span class="pi">↯</span><p><b>Minimal egress.</b> Only the screenshot or transcript text you explicitly ask about is sent to Claude — nothing on a timer.</p></div>
     <div class="pv"><span class="pi">⌗</span><p><b>Keys in the keychain.</b> Your API key is encrypted at rest by the OS and never written in plaintext.</p></div>
-    <div class="pv"><span class="pi">🫥</span><p><b>Yours alone.</b> The overlay is excluded from screen capture, so it never leaks into a share or recording.</p></div>
+    <div class="pv"><span class="pi">🫥</span><p><b>OS-level protection.</b> Cue asks macOS and Windows to exclude the overlay from supported capture software. Full-display compatibility can vary by app and OS version.</p></div>
   </div>
   <p class="consent">⚖️ Recording meetings can be subject to all-party-consent laws where you live. You're responsible for getting any consent required before recording anyone — read the <a href="https://github.com/Akshayan03/Cue/blob/main/TERMS.md">Terms</a> and <a href="https://github.com/Akshayan03/Cue/blob/main/PRIVACY.md">Privacy Policy</a>.</p>
 </section>
 
 <footer>
   <div class="wrap">
-    cue <span id="ver">v1.0.3</span> · <a href="https://github.com/Akshayan03/Cue/releases">all releases</a> · <a href="https://github.com/Akshayan03/Cue">source on github</a> · built with claude<br>
+    cue <span id="ver">v1.0.6</span> · <a href="https://github.com/Akshayan03/Cue/releases">all releases</a> · <a href="https://github.com/Akshayan03/Cue">source on github</a> · built with claude<br>
     <span style="opacity:.65">not affiliated with anthropic · claude is a trademark of anthropic, pbc</span>
   </div>
 </footer>
@@ -471,14 +474,13 @@
         var a = rel.assets.find(test);
         return a ? a.browser_download_url : null;
       };
-      var isArm = /Mac/.test(navigator.platform) || navigator.userAgent.includes("Macintosh");
       var macArm = find(function (a) { return /arm64-mac\.zip$/.test(a.name); });
       var macX64 = find(function (a) { return /[0-9]-mac\.zip$/.test(a.name) && !/arm64/.test(a.name); });
       var winExe = find(function (a) { return /\.exe$/.test(a.name); });
       var mac = macArm || macX64;
       if (mac) document.getElementById("dl-mac").href = mac;
+      if (macX64) document.getElementById("dl-mac-intel").href = macX64;
       if (winExe) document.getElementById("dl-win").href = winExe;
-      if (mac) document.getElementById("nav-dl").href = isArm ? mac : (winExe || mac);
       var ver = rel.tag_name || "";
       if (ver) {
         document.getElementById("ver").textContent = ver;

@@ -29,7 +29,7 @@ const ITEMS = [
   { to: "/live", label: "Live", icon: <Wave /> },
   { to: "/assistant", label: "Ask", icon: <Spark /> },
   { to: "/record", label: "Record", icon: <Rec /> },
-  { to: "/library", label: "Saved", icon: <Stack /> },
+  { to: "/library", label: "Notes", icon: <Stack /> },
 ];
 
 /** Hotkey hint that matches the tab you're on. */

@@ -95,19 +95,34 @@ const Record: React.FC<RecordProps> = ({ setSavedTranscripts }) => {
         mixedAny = true;
       }
       if (captureMic) {
-        try {
-          const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-          audioCtx.createMediaStreamSource(mic).connect(dest);
-          tracks.push(...mic.getAudioTracks());
-          mixedAny = true;
-        } catch {
-          /* mic denied — continue */
+        // Never mix a mic track that macOS hasn't actually granted — the OS
+        // substitutes a fake beeping tone that would pollute the recording.
+        const micAllowed =
+          !window.electron?.ensureMic || (await window.electron.ensureMic()) === "granted";
+        if (micAllowed) {
+          try {
+            const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioCtx.createMediaStreamSource(mic).connect(dest);
+            tracks.push(...mic.getAudioTracks());
+            mixedAny = true;
+          } catch {
+            /* mic denied — continue */
+          }
+        } else {
+          setError(
+            "Microphone access is blocked, so your voice won't be in this recording. Enable Cue in System Settings → Privacy & Security → Microphone."
+          );
         }
       }
 
       const combined = new MediaStream();
       display.getVideoTracks().forEach((t) => combined.addTrack(t));
       if (mixedAny) dest.stream.getAudioTracks().forEach((t) => combined.addTrack(t));
+      // Recording continues video-only, but say so — otherwise the user finds
+      // out only when the transcript comes back empty.
+      if (!mixedAny) {
+        setError("No audio is being captured — this recording will be video-only with no transcript. Allow microphone access in System Settings, then try again.");
+      }
 
       tracksRef.current = tracks;
       audioCtxRef.current = audioCtx;
@@ -151,7 +166,10 @@ const Record: React.FC<RecordProps> = ({ setSavedTranscripts }) => {
     []
   );
 
-  const liveText = transcriber.segments.map((s) => s.text).join(" ");
+  // Committed segments plus the live re-transcription of the current window.
+  const liveText = [...transcriber.segments.map((s) => s.text), transcriber.interim]
+    .filter(Boolean)
+    .join(" ");
 
   const save = async () => {
     const content = liveText.trim();

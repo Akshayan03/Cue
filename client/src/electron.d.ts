@@ -18,12 +18,17 @@ export interface ElectronAPI {
   onCoachDone: (cb: (text: string) => void) => () => void;
   onCoachError: (cb: (text: string) => void) => () => void;
   onCoachTrigger: (cb: () => void) => () => void;
+  onSessionClear?: (cb: () => void) => () => void;
   summarize: (payload: { title: string; transcript: string }) => Promise<MeetingBrief>;
+  workerSource?: () => Promise<string>;
+  ensureMic?: () => Promise<"granted" | "denied">;
   getSettings: () => Promise<ProviderSettings>;
   setSettings: (payload: {
     provider?: "cli" | "api";
     apiKey?: string;
     apiModel?: string;
+    coachProfile?: "general" | "sales" | "interview" | "coding";
+    customInstructions?: string;
   }) => Promise<ProviderSettings>;
 }
 
@@ -37,6 +42,8 @@ export interface ProviderSettings {
   encryptionAvailable?: boolean;
   /** The provider that will actually be used right now. */
   effective: "cli" | "api";
+  coachProfile?: "general" | "sales" | "interview" | "coding";
+  customInstructions?: string;
 }
 
 declare global {
