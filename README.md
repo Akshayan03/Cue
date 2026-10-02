@@ -4,14 +4,78 @@
 
 - floats over **any** app (not a browser tab),
 - toggles with a **global hotkey**,
-- is **invisible to screen-share and recording** (it won't appear when you share your screen),
+- uses **OS-level capture protection** (compatibility varies by sharing app and operating system),
 - listens to your meeting and tells you **what to say next** (`⌘J`),
 - answers questions about your **screen, live audio, and conversation context** in one command bar,
 - surfaces **dynamic insights** and automatically answers direct questions,
 - records your screen + system audio, transcribes **on-device**, and generates AI meeting briefs.
 
-Local-first: recordings and transcripts stay on your machine. Only the screenshot/text you
-explicitly ask about is sent to Claude.
+Local-first: recordings and transcripts are stored on your machine. Relevant text and optional
+screenshots are sent to Claude for AI features, including automatic live answers when enabled.
+
+## Interview preparation (development build)
+
+Every interview starts with a preparation screen:
+
+1. Paste or upload your résumé and the job description (PDF, DOCX, TXT, or Markdown; up to
+   10 MB / 30,000 characters per document). Scanned PDFs need their text pasted manually.
+2. Add facts, dictate notes with **Speak**, and chat with Cue to rehearse or build a briefing.
+3. Choose **Interviewer / call audio** for remote calls, or **Microphone** for in-person
+   conversations. Call mode does not mix in your microphone.
+4. Start the session. Cue carries the documents and prep conversation into live answers.
+   Auto-answer detects questions and prompts such as “tell me about…” after an audio pause.
+   You can also type a question or use `⌘J`. Screenshots are opt-in for typed questions.
+
+Interview preparation and live answers use **`claude-opus-5-5` through your Claude Code
+subscription login**, without an API-key fallback. Install Claude Code **2.1.280 or newer**
+and sign in with `claude auth login`. An account-status check does not prove that an OAuth
+token is still valid; a successful response verifies access. Renew your login if it expires.
+
+Live responses stream with low effort; prep uses medium effort. Time to first text is measured
+in the UI, not guaranteed: model access, network conditions, Claude usage limits, and local
+speech recognition all affect latency. Live answers are written to be said as-is: first person,
+grounded in your résumé, notes, and prep chat, and tied to the job description, with no
+placeholder brackets. Cue won't invent employers, metrics, or projects that aren't in your
+material, so the more real detail you add in prep, the more specific the answers.
+
+Your résumé, job description, notes, and prep chat are saved locally, so they survive restarts
+and switching tabs. **New interview** clears them. The meeting library saves only the
+transcript and generated meeting brief. Auto-answer sends the relevant transcript and prep to
+Claude. The CLI runs without project settings, hooks, MCP servers, or session persistence.
+Audio transcription is local. Only use capture where you have the required permission.
+
+### Teams / Zoom with headphones
+
+Select **Teams / Zoom / call audio (headphones OK)**, not Microphone. Cue uses digital system
+audio loopback; it does not need the interviewer's voice to play through your speakers. This
+build uses Electron 44.5.1, with the macOS system-audio permission description included.
+macOS 14.2+ or Windows is required for this capture path. On macOS it uses a Core Audio tap
+and needs only the **System Audio Recording** permission, not Screen Recording. Allow Cue
+when macOS asks. If no prompt appears and the meter stays still, add Cue under
+**Privacy & Security → Screen & System Audio Recording → System Audio Recording Only** and
+reopen Cue. Being switched on in the main Screen & System Audio Recording list isn't enough.
+
+Before relying on a session:
+
+1. Join the meeting with computer audio, not phone-only audio. Headphones, AirPods, or
+   speakers all work, because Cue captures the audio before it reaches any output device.
+2. In Cue, click **Test call audio**. In Teams, use its device speaker/test-call feature; in
+   Zoom, use **Test Speaker**. Confirm Cue says **Receiving call audio** and the meter moves.
+3. Stop the check, then start the interview. Confirm actual speech appears in **Transcript**.
+   A moving meter proves audio capture, not speech-recognition accuracy.
+
+The check only measures local sound levels; it does not save audio, transcribe it, or send it
+to AI. During the interview, the status dot shows **Listening**, and the audio panel only appears
+when something needs attention. If capture stops or you change headsets, use the **↻** reconnect
+button; preparation and the transcript are preserved. Silence can simply mean
+the other person isn't speaking, so the app reports it as a check, not a definitive failure.
+Call mode captures system-wide application audio, not only the meeting: pause music and mute
+unneeded notification sounds. It does not capture your microphone; use the separate microphone
+mode only for in-person conversations. Test your actual headset/app combination before a call.
+
+References: [Electron capture permissions](https://www.electronjs.org/docs/latest/api/desktop-capturer),
+[Teams audio settings](https://support.microsoft.com/en-us/teams/notifications-settings/manage-your-device-settings-in-microsoft-teams),
+[Zoom audio test](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0062765).
 
 ## Download
 
@@ -31,15 +95,18 @@ explicitly ask about is sent to Claude.
 
 Cue reaches Claude one of two ways; pick either in **Settings** (the gear in the app):
 
-1. **Claude Code CLI** — if you already have [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-   installed and signed in (`claude` once to log in), Cue uses it. No API key, no separate cost
-   beyond your Claude subscription.
+1. **Claude Code CLI** — install [Claude Code](https://code.claude.com/docs/en/overview)
+   2.1.280 or newer and sign in (`claude auth login`). Cue uses your own account and its usage
+   limits. No API key is bundled; subscription/model eligibility still applies.
 2. **Your own Anthropic API key** — paste a key from
    [console.anthropic.com](https://console.anthropic.com/settings/keys). It's stored **encrypted
    on your device** via the OS keychain and is sent only to Anthropic, never to any Cue server.
 
 **Nothing is bundled** — there's no shared/built-in API key. On first launch, Cue detects whether
 the CLI is present and walks you through whichever option you choose.
+
+The provider selection applies to the screen assistant and meeting briefs. Interview prep and
+live interview responses always use the Claude subscription with Opus 5.5.
 
 > ⚖️ **Before you record anyone, read [`TERMS.md`](./TERMS.md) and [`PRIVACY.md`](./PRIVACY.md).**
 > Recording meetings can be subject to all-party-consent (wiretapping) laws. You are responsible
@@ -50,9 +117,9 @@ the CLI is present and walks you through whichever option you choose.
 | Shortcut | Action |
 |---|---|
 | `⌘ \` | Show / hide the overlay |
-| `⌘ J` | **What do I say?** — instant live suggestion during a meeting |
+| `⌘ J` | Request a live answer using your preparation and conversation |
 | `⌘ ↵` | Show overlay and focus the "ask about my screen" box |
-| `⌘ R` | Clear the current session context |
+| `⌘ R` | Clear the current answer/chat; preserve interview preparation and transcript |
 | `⌘ ←` / `⌘ →` | Move the overlay left or right |
 | `⌘ ⇧ \` | Toggle click-through (interact with the app underneath) |
 
@@ -81,6 +148,8 @@ yarn --cwd client install     # the React UI (client is a yarn project)
 # Launch — starts the React dev server and the Electron overlay together
 npm run dev
 ```
+
+Run checks with `npm test` and `CI=true npm test --prefix client -- --watchAll=false --runInBand`.
 
 Press `⌘\` to summon the overlay over whatever you're doing.
 
@@ -138,10 +207,9 @@ published `.zip` / `.exe` assets.
 
 These are the natural next steps, roughly in order of value:
 
-1. **Feed the live transcript into the assistant.** Transcription already runs on-device. Next,
-   stream those segments into the screen assistant so it can answer *"what did they just ask me?"*
-   in real time during a call. For higher accuracy on long meetings, swap the `whisper-tiny` model
-   for `whisper-base`/`small` (one string in `useTranscriber.ts`), or move STT to WebGPU.
+1. **Improve speech recognition accuracy.** Live interview answers already use the transcript
+   and preparation. Evaluate larger on-device speech models and WebGPU, especially for technical
+   terms, accents, and noisy calls.
 2. **Calendar integration.** Pull meeting titles/attendees from Google Calendar so briefs
    are pre-titled and action items can be attributed to real people.
 3. **Auto-send the brief.** After a meeting, email the brief or post it to Slack/Notion.

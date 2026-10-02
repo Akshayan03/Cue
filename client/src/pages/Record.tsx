@@ -147,7 +147,9 @@ const Record: React.FC<RecordProps> = ({ setSavedTranscripts }) => {
       timerRef.current = window.setInterval(() => setElapsed(getElapsed()), 250);
 
       // Feed the mixed audio to the local Whisper transcriber.
-      if (mixedAny) transcriber.start(dest.stream, getElapsed);
+      if (mixedAny) transcriber.start(dest.stream, getElapsed).catch(() => {
+        setError("Recording continues, but transcription couldn't start. Try another recording after checking the speech model connection.");
+      });
 
       recordingRef.current = true;
       setRecording(true);

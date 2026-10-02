@@ -2,7 +2,11 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const crypto = require("crypto");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
+const { promisify } = require("util");
+const execFileAsync = promisify(execFile);
+const { OPUS_MODEL, MIN_CLI_VERSION, oauthEnvironment, supportsOpus, buildInterviewPrompt, INTERVIEW_SYSTEM } = require("./interview");
+const { extractDocument } = require("./documents");
 const {
   app,
   BrowserWindow,
@@ -15,6 +19,7 @@ const {
   protocol,
   net,
   systemPreferences,
+  dialog,
 } = require("electron");
 const { pathToFileURL } = require("url");
 
@@ -37,15 +42,12 @@ protocol.registerSchemesAsPrivileged([
 //           with the user's account (OAuth). No API key stored by Cue.
 //   "api" — call the Anthropic API directly with an API key the user supplies,
 //           stored encrypted at rest via the OS keychain (safeStorage).
-// System-audio loopback for getDisplayMedia on macOS via ScreenCaptureKit.
-// Without this, Chromium only supports loopback audio on Windows — Mac
-// recordings came back with a video track and NO audio, so there was nothing
-// to transcribe in Live or Record mode. Requires macOS 13+.
-if (process.platform === "darwin") {
-  app.commandLine.appendSwitch("enable-features", "MacLoopbackAudioForScreenShare");
-}
+// Electron 44 captures system audio natively (CoreAudio Tap on macOS 14.2+).
+// Do not rely on the obsolete MacLoopbackAudioForScreenShare feature flag.
+// The packaged Info.plist includes NSAudioCaptureUsageDescription; missing it
+// can produce a live-looking but silent audio track on modern macOS.
 
-const MODEL = process.env.CLAUDE_MODEL || "sonnet"; // CLI model alias
+const MODEL = OPUS_MODEL; // Pin the requested model; never silently downgrade.
 const API_URL = "https://api.anthropic.com/v1/messages";
 const API_VERSION = "2023-06-01";
 // Default full model id for the API path (overridable in settings/env).
@@ -149,17 +151,22 @@ function spawnClaude(extraArgs, prompt) {
     "-p",
     "--model", MODEL,
     "--strict-mcp-config", // skip MCP servers → faster startup
+    "--setting-sources", "", // don't inherit user hooks, API routing, or project tools
+    "--settings", JSON.stringify({ disableAllHooks: true, fastMode: false }),
+    "--no-session-persistence",
+    "--disable-slash-commands",
+    "--no-chrome",
+    "--permission-mode", "dontAsk",
+    ...(extraArgs.includes("--effort") ? [] : ["--effort", "low"]),
     ...extraArgs,
   ];
   // CLI mode means "the user's own Claude login" (keychain OAuth). Strip every
   // ANTHROPIC_*/CLAUDE* env var so nothing inherited from a shell can re-route
   // or re-authenticate the CLI — a stale ANTHROPIC_API_KEY, a proxy
   // ANTHROPIC_BASE_URL, or CLAUDE_CODE_* vars from a parent Claude session.
-  const env = {};
-  for (const [k, v] of Object.entries(process.env)) {
-    if (!/^(ANTHROPIC_|CLAUDE)/i.test(k)) env[k] = v;
-  }
+  const env = oauthEnvironment();
   const child = spawn(CLAUDE_BIN, args, { cwd: workDir, env });
+  child.stdin.on("error", () => {}); // exit/error handlers report a failed launch
   child.stdin.write(prompt);
   child.stdin.end();
   return child;
@@ -204,23 +211,31 @@ function createWindow() {
 
   win.setAlwaysOnTop(true, "screen-saver");
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  win.setContentProtection(true); // invisible to screen-share / recording
+  win.setContentProtection(true); // OS capture protection; sharing-app compatibility varies
 
   // Deterministic capture: primary screen + system-audio loopback, no picker.
   // The native macOS picker would bypass this callback's audio spec, and the
-  // ScreenCaptureKit loopback (see the feature flag at the top) only applies
-  // when we hand Chromium `audio: "loopback"` ourselves.
+  // Grant unmuted system loopback: the user must still hear Teams/Zoom in
+  // their headphones. Never substitute the microphone for call audio.
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    // Call audio only needs the loopback track. Use Cue's own frame as the
+    // required video source, so it needs System Audio Recording but not
+    // Screen Recording.
+    if (audioOnlyCapture) {
+      audioOnlyCapture = false;
+      return request.frame ? callback({ video: request.frame, audio: "loopback" }) : callback({});
+    }
     desktopCapturer
-      .getSources({ types: ["screen"] })
+      .getSources({ types: ["screen"], thumbnailSize: { width: 0, height: 0 } })
       .then((sources) => {
         // No screen available (e.g. permission denied) — cancel cleanly
         // instead of passing an undefined source, which throws.
         if (!sources.length) return callback({});
-        callback({ video: sources[0], audio: "loopback" });
+        const primaryId = String(screen.getPrimaryDisplay().id);
+        callback({ video: sources.find(source => source.display_id === primaryId) || sources[0], audio: "loopback" });
       })
       .catch(() => callback({}));
-  });
+  }, { useSystemPicker: false });
 
   // CUE_TEST_PROD=1 loads the production bundle in dev (for testing the
   // packaged code path without building the app).
@@ -447,16 +462,18 @@ function streamClaude(event, prefix, opts) {
 }
 
 // ---- CLI streaming runner ----
-function streamCli(event, prefix, { prompt, system, allowRead, onClose }) {
+function streamCli(event, prefix, { prompt, system, allowRead, readFile, onClose, effort = "low" }) {
   cancelPrev(prefix);
 
   const args = [
     "--output-format", "stream-json",
     "--include-partial-messages",
     "--verbose",
-    "--append-system-prompt", system,
+    "--system-prompt", system,
+    "--effort", effort,
+    "--tools", allowRead ? "Read" : "",
   ];
-  if (allowRead) args.push("--allowedTools", "Read");
+  if (allowRead) args.push("--allowedTools", readFile ? `Read(./${readFile})` : "Read");
 
   const child = spawnClaude(args, prompt);
   activeChildren[prefix] = child;
@@ -464,6 +481,7 @@ function streamCli(event, prefix, { prompt, system, allowRead, onClose }) {
   let stderr = "";
   let buf = "";
   let settled = false;
+  let resultError = "";
 
   // Kill a hung CLI so the UI doesn't sit on "Thinking…" forever.
   const timer = setTimeout(() => {
@@ -477,6 +495,7 @@ function streamCli(event, prefix, { prompt, system, allowRead, onClose }) {
   }, REQUEST_TIMEOUT_MS);
 
   child.stdout.on("data", (d) => {
+    if (child.superseded) return;
     buf += d.toString();
     let idx;
     while ((idx = buf.indexOf("\n")) >= 0) {
@@ -496,8 +515,9 @@ function streamCli(event, prefix, { prompt, system, allowRead, onClose }) {
       ) {
         acc += obj.event.delta.text;
         event.sender.send(`${prefix}:delta`, obj.event.delta.text);
-      } else if (obj.type === "result" && typeof obj.result === "string") {
-        acc = obj.result;
+      } else if (obj.type === "result") {
+        if (obj.is_error) resultError = obj.result || (obj.errors || []).join("\n") || "Claude couldn't complete the response.";
+        else if (typeof obj.result === "string") acc = obj.result;
       }
     }
   });
@@ -520,7 +540,13 @@ function streamCli(event, prefix, { prompt, system, allowRead, onClose }) {
       }
     }
     if (child.superseded) return; // a newer request replaced this one — stay quiet
-    if (child.timedOut && !acc) return event.sender.send(`${prefix}:error`, "Claude took too long to respond. Please try again.");
+    if (resultError) {
+      const message = /OAuth|authenticate|authentication|401/i.test(resultError)
+        ? "Your Claude login needs to be renewed. Run claude auth login in Terminal, complete sign-in, then retry. " + resultError
+        : resultError;
+      return event.sender.send(`${prefix}:error`, message);
+    }
+    if (child.timedOut) return event.sender.send(`${prefix}:error`, "Claude took too long to finish. Any text above may be incomplete; please retry.");
     if (code === 0 || acc) event.sender.send(`${prefix}:done`, acc);
     else event.sender.send(`${prefix}:error`, stderr.trim() || `Claude exited with code ${code}.`);
   });
@@ -754,7 +780,7 @@ async function summarizeApi(prompt) {
 }
 
 function summarizeCli(prompt) {
-  const child = spawnClaude(["--output-format", "json"], prompt);
+  const child = spawnClaude(["--output-format", "json", "--tools", ""], prompt);
   let out = "";
   let stderr = "";
   child.stdout.on("data", (d) => (out += d.toString()));
@@ -819,16 +845,111 @@ ipcMain.handle("worker:source", () =>
 );
 
 // ---- Settings / provider status (for onboarding) ----
+async function checkInterviewConnection() {
+  if (!CLI_FOUND) throw new Error("Install Claude Code and sign in with claude auth login first.");
+  const options = { cwd: workDir, env: oauthEnvironment(), timeout: 12000, maxBuffer: 1024 * 1024 };
+  const [{ stdout: version }, { stdout: authText }] = await Promise.all([
+    execFileAsync(CLAUDE_BIN, ["--version"], options),
+    execFileAsync(CLAUDE_BIN, ["auth", "status", "--json"], options),
+  ]);
+  const auth = JSON.parse(authText);
+  if (!auth.loggedIn || auth.authMethod !== "claude.ai" || auth.apiProvider !== "firstParty") {
+    throw new Error("Sign in to your Claude subscription using claude auth login. Interview sessions require your Claude account.");
+  }
+  if (!supportsOpus(version)) throw new Error(`Opus 5.5 needs Claude Code ${MIN_CLI_VERSION} or later. Run claude update, then reopen Cue.`);
+  return { connected: true, model: OPUS_MODEL, version: version.trim(), subscription: auth.subscriptionType || "Claude account" };
+}
+
+ipcMain.handle("session:check", checkInterviewConnection);
+// macOS system loopback uses Core Audio taps, which arrived in macOS 14.2 (Darwin 23.2).
+function supportsSystemAudio() {
+  if (process.platform === "win32") return true;
+  if (process.platform !== "darwin") return false;
+  const [major, minor] = os.release().split(".").map(Number);
+  return major > 23 || (major === 23 && minor >= 2);
+}
+ipcMain.handle("audio:support", () => ({
+  platform: process.platform,
+  supported: supportsSystemAudio(),
+  screenPermission: process.platform === "darwin" ? systemPreferences.getMediaAccessStatus("screen") : "granted",
+}));
+// Flags the next getDisplayMedia request as call audio only (see the display media handler).
+let audioOnlyCapture = false;
+ipcMain.handle("capture:audio-only", () => { audioOnlyCapture = true; });
+ipcMain.handle("document:import", async () => {
+  const result = await dialog.showOpenDialog(win, {
+    title: "Add interview context",
+    properties: ["openFile"],
+    filters: [{ name: "Documents", extensions: ["pdf", "docx", "txt", "md"] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return extractDocument(result.filePaths[0]);
+});
+
+let sessionRequest = null;
+ipcMain.handle("session:cancel", (_event, id) => {
+  if (!id || sessionRequest === id) {
+    sessionRequest = null;
+    cancelPrev("interview");
+  }
+});
+ipcMain.handle("session:respond", async (event, payload) => {
+  if (!payload || typeof payload.id !== "string" || payload.id.length > 100) throw new Error("Invalid request.");
+  const id = payload.id;
+  sessionRequest = id;
+  cancelPrev("interview");
+  let shotFile = null;
+  const send = (type, text) => {
+    if (sessionRequest === id && !event.sender.isDestroyed()) event.sender.send("session:stream", { id, type, text });
+  };
+  try {
+    let prompt = buildInterviewPrompt(payload);
+    if (payload.includeScreen) {
+      if (!screenPermissionGranted()) throw new Error(SCREEN_PERM_ERROR);
+      // Time out stalled capture, and delete any file that arrives after timeout.
+      let captureAbandoned = false;
+      const capture = captureScreenshotToFile().then(file => {
+        if (captureAbandoned && file) fs.rm(path.join(workDir, file), { force: true }, () => {});
+        return file;
+      });
+      try { shotFile = await withTimeout(capture, 8000); }
+      catch (err) { captureAbandoned = true; throw err; }
+      if (!shotFile) throw new Error("Screen capture failed. Turn off screen context or check Screen Recording permission.");
+      prompt += `\nScreenshot: read ONLY ./${shotFile} as additional reference data.`;
+    }
+    if (sessionRequest !== id) {
+      if (shotFile) fs.rm(path.join(workDir, shotFile), { force: true }, () => {});
+      return;
+    }
+    streamCli({ sender: { send: (channel, text) => send(channel.split(":")[1], text) } }, "interview", {
+      prompt,
+      system: `${INTERVIEW_SYSTEM}\n${personalization()}`,
+      allowRead: Boolean(shotFile),
+      readFile: shotFile,
+      effort: payload.kind === "prep" ? "medium" : "low",
+      onClose: () => { if (shotFile) fs.rm(path.join(workDir, shotFile), { force: true }, () => {}); },
+    });
+  } catch (err) { send("error", err.message || "Couldn't contact Claude."); }
+});
+
+// safeStorage reads Cue's key from the macOS keychain, and after an app update
+// that read can stop on a login-password prompt. Only check it when an API key
+// is stored, so starting an interview never waits on the keychain.
+function encryptionStatus(s) {
+  return s.apiKeyEnc ? safeStorage.isEncryptionAvailable() : undefined;
+}
+
 ipcMain.handle("settings:get", () => {
   const s = loadSettings();
   return {
     provider: s.provider,
+    cliModel: MODEL,
     hasApiKey: Boolean(s.apiKeyEnc),
     apiModel: s.apiModel,
     coachProfile: s.coachProfile,
     customInstructions: s.customInstructions,
     cliFound: CLI_FOUND,
-    encryptionAvailable: safeStorage.isEncryptionAvailable(),
+    encryptionAvailable: encryptionStatus(s),
     effective: effectiveProvider(),
   };
 });
@@ -854,12 +975,13 @@ ipcMain.handle("settings:set", (_event, { provider, apiKey, apiModel: model, coa
   persistSettings(next);
   return {
     provider: next.provider,
+    cliModel: MODEL,
     hasApiKey: Boolean(next.apiKeyEnc),
     apiModel: next.apiModel,
     coachProfile: next.coachProfile,
     customInstructions: next.customInstructions,
     cliFound: CLI_FOUND,
-    encryptionAvailable: safeStorage.isEncryptionAvailable(),
+    encryptionAvailable: encryptionStatus(next),
     effective: effectiveProvider(),
   };
 });

@@ -40,6 +40,6 @@ self.onmessage = async (e) => {
       self.postMessage({ type: "text", text: (out.text || "").trim(), t: d.t, gen: d.gen, final: d.final });
     }
   } catch (err) {
-    self.postMessage({ type: "error", error: String(err && err.message ? err.message : err) });
+    self.postMessage({ type: "error", error: String(err && err.message ? err.message : err), gen: d.gen });
   }
 };

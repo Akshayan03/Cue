@@ -74,9 +74,11 @@ const Assistant: React.FC = () => {
       micStreamRef.current = stream;
       dictBaseRef.current = question.trim() ? `${question.trim()} ` : "";
       voice.reset();
-      voice.start(stream, () => 0);
+      await voice.start(stream, () => 0);
       setMicOn(true);
     } catch {
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
       setError("Couldn't access the microphone.");
     }
   };

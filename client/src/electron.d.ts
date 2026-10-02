@@ -1,9 +1,17 @@
 import { MeetingBrief } from "./types";
+import { InterviewContext, ChatTurn } from "./interview";
 
 export type CoachMode = "say" | "answer" | "followup" | "objection";
 
 export interface ElectronAPI {
   isElectron: true;
+  checkInterviewConnection: () => Promise<{ connected: boolean; model: string; version: string; subscription: string }>;
+  audioSupport: () => Promise<{ platform: string; supported: boolean; screenPermission: string }>;
+  prepareAudioCapture: () => Promise<void>;
+  importDocument: () => Promise<{ name: string; text: string } | null>;
+  respond: (payload: { id: string; context: InterviewContext; history: ChatTurn[]; transcript?: string; question: string; kind: "prep" | "live"; mode?: CoachMode; includeScreen?: boolean }) => Promise<void>;
+  cancelResponse: (id?: string) => Promise<void>;
+  onSessionStream: (cb: (event: { id: string; type: "delta" | "done" | "error"; text: string }) => void) => () => void;
   hide: () => Promise<void>;
   quit: () => Promise<void>;
   toggleClickThrough: () => Promise<void>;
@@ -33,6 +41,7 @@ export interface ElectronAPI {
 }
 
 export interface ProviderSettings {
+  cliModel?: string;
   provider: "cli" | "api";
   hasApiKey: boolean;
   apiModel: string;

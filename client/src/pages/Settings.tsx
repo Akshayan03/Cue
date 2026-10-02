@@ -103,8 +103,8 @@ const Settings: React.FC = () => {
           <span>
             <strong>Claude Code CLI</strong>
             <span className="muted small block">
-              Uses the Claude Code app you've installed and signed in with your own account. No API
-              key needed.{" "}
+              Uses your signed-in Claude account with Opus 5.5. Live answers use low effort for speed;
+              preparation uses medium effort. No API key needed.{" "}
               {settings &&
                 (cliReady ? (
                   <span className="ok">✓ Detected on this machine</span>
@@ -185,6 +185,12 @@ const Settings: React.FC = () => {
             </span>
           )}
         </div>
+      </div>
+
+      <div className="card">
+        <h2 className="card-title">Interview sessions</h2>
+        <p className="muted small">Every new session starts with your résumé, job description, background notes, and a voice or text preparation chat. Interview answers always use your Claude account and Opus 5.5.</p>
+        <p className="muted small mt">If your login expires, run <code>claude auth login</code> and recheck the connection. Claude Code 2.1.280 or newer is required.</p>
       </div>
 
       <div className="card">

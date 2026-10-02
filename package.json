@@ -6,6 +6,7 @@
   "author": "Akshayan",
   "license": "MIT",
   "scripts": {
+    "test": "node --test tests/*.test.js",
     "dev": "concurrently -k \"BROWSER=none npm start --prefix client\" \"wait-on http://localhost:3000 && electron .\"",
     "electron": "electron .",
     "build:client": "npm run build --prefix client",
@@ -17,11 +18,13 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.3.9",
+    "mammoth": "1.13.0",
+    "pdf-parse": "2.4.5"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
-    "electron": "^33.2.0",
+    "electron": "44.5.1",
     "electron-builder": "^25.1.8",
     "wait-on": "^8.0.1"
   },
@@ -53,6 +56,7 @@
         }
       ],
       "extendInfo": {
+        "NSAudioCaptureUsageDescription": "Cue captures system audio from calls such as Teams and Zoom to transcribe the interviewer, including when you use headphones.",
         "NSMicrophoneUsageDescription": "Cue records your microphone so it can transcribe what you say during meetings.",
         "NSCameraUsageDescription": "Cue does not use the camera.",
         "NSScreenCaptureUsageDescription": "Cue captures your screen so it can answer questions about what's on it and record your meetings."

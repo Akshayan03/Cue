@@ -1,6 +1,42 @@
 import { Transcript } from "./types";
+import { emptyContext, InterviewContext } from "./interview";
 
 const TRANSCRIPTS_KEY = "cue.transcripts";
+const INTERVIEW_PREP_KEY = "cue.interviewPrep";
+
+/** Interview prep (résumé, job description, notes, prep chat) survives
+ * restarts and tab switches, so live answers always have it. */
+export function loadInterviewPrep(): InterviewContext {
+  try {
+    const saved = JSON.parse(localStorage.getItem(INTERVIEW_PREP_KEY) || "null");
+    if (!saved || typeof saved !== "object") return emptyContext();
+    const text = (value: unknown) => (typeof value === "string" ? value : "");
+    return {
+      title: text(saved.title),
+      resume: text(saved.resume),
+      jobDescription: text(saved.jobDescription),
+      notes: text(saved.notes),
+      briefing: text(saved.briefing),
+      prepConversation: Array.isArray(saved.prepConversation)
+        ? saved.prepConversation.filter((t: any) => t && (t.role === "user" || t.role === "assistant") && typeof t.text === "string")
+        : [],
+    };
+  } catch {
+    return emptyContext();
+  }
+}
+
+export function saveInterviewPrep(context: InterviewContext): void {
+  try {
+    localStorage.setItem(INTERVIEW_PREP_KEY, JSON.stringify(context));
+  } catch (e) {
+    console.error("Couldn't persist interview prep:", e);
+  }
+}
+
+export function clearInterviewPrep(): void {
+  try { localStorage.removeItem(INTERVIEW_PREP_KEY); } catch { /* storage unavailable */ }
+}
 const LEGACY_TRANSCRIPTS_KEY = "transcribai.transcripts"; // pre-rebrand key
 
 /** Transcript metadata + text + brief live in localStorage (small, synchronous). */

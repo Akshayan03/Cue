@@ -3,6 +3,17 @@ const { contextBridge, ipcRenderer } = require("electron");
 // Safe bridge between the overlay UI (renderer) and the native main process.
 contextBridge.exposeInMainWorld("electron", {
   isElectron: true,
+  checkInterviewConnection: () => ipcRenderer.invoke("session:check"),
+  audioSupport: () => ipcRenderer.invoke("audio:support"),
+  prepareAudioCapture: () => ipcRenderer.invoke("capture:audio-only"),
+  importDocument: () => ipcRenderer.invoke("document:import"),
+  respond: (payload) => ipcRenderer.invoke("session:respond", payload),
+  cancelResponse: (id) => ipcRenderer.invoke("session:cancel", id),
+  onSessionStream: (cb) => {
+    const h = (_event, payload) => cb(payload);
+    ipcRenderer.on("session:stream", h);
+    return () => ipcRenderer.removeListener("session:stream", h);
+  },
 
   // Window controls
   hide: () => ipcRenderer.invoke("window:hide"),
