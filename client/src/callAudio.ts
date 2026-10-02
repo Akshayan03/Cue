@@ -2,6 +2,15 @@ import { AudioSource } from "./interview";
 
 export const CALL_AUDIO_HELP = "On a Mac, turn on Cue under System Settings → Privacy & Security → Screen & System Audio Recording → System Audio Recording Only, then reopen Cue.";
 
+/** Whether an error can be fixed by granting System Audio Recording. */
+export const needsAudioPermission = (message: string | null) => Boolean(message?.includes(CALL_AUDIO_HELP));
+
+// Prompt natively so the user can jump straight to the Settings pane.
+function callAudioBlocked(reason: string) {
+  window.electron?.promptAudioPermission?.().catch(() => {});
+  return new Error(`${reason} ${CALL_AUDIO_HELP}`);
+}
+
 export function stopAudioCapture(stream: MediaStream | null) {
   stream?.getTracks().forEach(track => track.stop());
 }
@@ -25,7 +34,7 @@ export async function openInterviewAudio(source: AudioSource): Promise<MediaStre
       } as DisplayMediaStreamOptions);
     } catch (e) {
       const reason = e instanceof Error ? e.message : "Capture was cancelled.";
-      throw new Error(`Couldn't capture call audio: ${reason} ${CALL_AUDIO_HELP}`);
+      throw callAudioBlocked(`Couldn't capture call audio: ${reason}`);
     }
   } else {
     if (window.electron?.ensureMic && await window.electron.ensureMic() !== "granted") throw new Error("Allow Microphone access for Cue in System Settings.");
@@ -33,7 +42,7 @@ export async function openInterviewAudio(source: AudioSource): Promise<MediaStre
   }
   if (!stream.getAudioTracks().some(track => track.readyState === "live" && track.enabled)) {
     stopAudioCapture(stream);
-    throw new Error(source === "system" ? `No call audio was shared, or its audio track already ended. macOS may be blocking system audio. ${CALL_AUDIO_HELP}` : "No active microphone audio track was returned.");
+    throw source === "system" ? callAudioBlocked("No call audio was shared, or its audio track already ended. macOS may be blocking system audio.") : new Error("No active microphone audio track was returned.");
   }
   return stream;
 }

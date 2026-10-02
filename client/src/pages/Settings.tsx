@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { isDesktop } from "../api";
 import { ProviderSettings } from "../electron";
+import ClaudeConnect from "../components/ClaudeConnect";
 
 /** Provider setup: use the local Claude Code CLI, or your own Anthropic API key.
  *  No key is bundled and nothing is sent to a Cue server — the key is stored
@@ -103,23 +104,12 @@ const Settings: React.FC = () => {
           <span>
             <strong>Claude Code CLI</strong>
             <span className="muted small block">
-              Uses your signed-in Claude account with Opus 5.5. Live answers use low effort for speed;
-              preparation uses medium effort. No API key needed.{" "}
-              {settings &&
-                (cliReady ? (
-                  <span className="ok">✓ Detected on this machine</span>
-                ) : (
-                  <span className="warn">
-                    Not found —{" "}
-                    <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noreferrer">
-                      install Claude Code
-                    </a>{" "}
-                    and run <code>claude</code> once to sign in.
-                  </span>
-                ))}
+              Uses your Claude account with Opus 5.5. Live answers use low effort for speed;
+              preparation uses medium effort. No API key needed.
             </span>
           </span>
         </label>
+        {provider === "cli" && <ClaudeConnect manage />}
 
         <label className="provider-opt">
           <input
@@ -190,7 +180,7 @@ const Settings: React.FC = () => {
       <div className="card">
         <h2 className="card-title">Interview sessions</h2>
         <p className="muted small">Every new session starts with your résumé, job description, background notes, and a voice or text preparation chat. Interview answers always use your Claude account and Opus 5.5.</p>
-        <p className="muted small mt">If your login expires, run <code>claude auth login</code> and recheck the connection. Claude Code 2.1.280 or newer is required.</p>
+        <p className="muted small mt">If your Claude login expires, choose <strong>Sign in again</strong> under AI provider.</p>
       </div>
 
       <div className="card">

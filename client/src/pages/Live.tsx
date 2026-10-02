@@ -7,9 +7,10 @@ import { AudioSource, emptyContext, InterviewContext, latestQuestion, questionKe
 import { CoachMode } from "../electron";
 import { Transcript } from "../types";
 import InterviewPrep from "../components/InterviewPrep";
-import { openInterviewAudio, stopAudioCapture } from "../callAudio";
+import { needsAudioPermission, openInterviewAudio, stopAudioCapture } from "../callAudio";
 import { useAudioHealth } from "../useAudioHealth";
 import AudioStatus from "../components/AudioStatus";
+import PrivacySettingsButton, { needsScreenPermission } from "../components/PrivacySettingsButton";
 import { clearInterviewPrep, loadInterviewPrep, saveInterviewPrep } from "../storage";
 
 interface LiveProps { setSavedTranscripts: React.Dispatch<React.SetStateAction<Transcript[]>> }
@@ -91,15 +92,16 @@ const Live: React.FC<LiveProps> = ({ setSavedTranscripts }) => {
 
   const trigger = useCallback((mode: CoachMode, override?: string) => {
     if (!activeRef.current || ending) return;
-    const currentQuestion = override || latestQuestion(transcriptRef.current) || "Suggest my next response based on the conversation.";
-    if (!transcriptRef.current.trim()) { setError("Waiting for conversation audio. You can also type a question below."); return; }
+    // With the screen on, a coding problem can be answered before anyone speaks.
+    const currentQuestion = override || latestQuestion(transcriptRef.current) || (includeScreen ? "Solve the problem or answer the question shown on my screen." : "Suggest my next response based on the conversation.");
+    if (!transcriptRef.current.trim() && !includeScreen) { setError("Waiting for conversation audio. You can also type a question below."); return; }
     setError(null);
     setCopied(false);
     setAskedQuestion(currentQuestion);
     const key = questionKey(currentQuestion);
     answeredKeys.current = [...answeredKeys.current.slice(-19), key];
-    respond({ context: frozenContext.current, transcript: transcriptRef.current.slice(-18000), question: currentQuestion, kind: "live", mode });
-  }, [respond, ending]);
+    respond({ context: frozenContext.current, transcript: transcriptRef.current.slice(-18000), question: currentQuestion, kind: "live", mode, includeScreen });
+  }, [respond, ending, includeScreen]);
   triggerRef.current = trigger;
 
   // A stable transcription plus an audio pause triggers the answer. A question
@@ -219,6 +221,15 @@ const Live: React.FC<LiveProps> = ({ setSavedTranscripts }) => {
     summarize({ title, transcript: content }).then(brief => setSavedTranscripts(prev => prev.map(t => t.id === id ? { ...t, brief } : t))).catch(() => {});
   };
 
+  // Check Screen Recording as soon as screen context is switched on. Without
+  // it, leave the screen off so answers keep working while the user fixes it.
+  const toggleScreen = async () => {
+    if (includeScreen) { setIncludeScreen(false); return; }
+    setIncludeScreen(true);
+    const problem = await window.electron?.checkScreen?.();
+    if (problem && alive.current) { setIncludeScreen(false); setError(problem); }
+  };
+
   const ask = () => {
     if (!question.trim() || ending) return;
     setCopied(false);
@@ -236,7 +247,7 @@ const Live: React.FC<LiveProps> = ({ setSavedTranscripts }) => {
 
   if (!isDesktop()) return <div className="page"><h1>Interview copilot</h1><div className="card">Open Cue on your desktop to prepare and start a live interview session.</div></div>;
   return <div className="page live live--session">
-    {error && <div role="alert" className="alert alert--error">{error}</div>}
+    {error && <div role="alert" className="alert alert--error">{error}{needsAudioPermission(error) && <PrivacySettingsButton pane="audio" />}{needsScreenPermission(error) && <PrivacySettingsButton pane="screen" />}</div>}
     {phase === "prep" ? <InterviewPrep context={context} setContext={setContext} ai={ai} audioSource={audioSource} setAudioSource={setAudioSource} starting={starting} onStart={start} onReset={resetPrep} /> : <>
       <div className="session-bar">
         <span className="drag-grip" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>
@@ -248,13 +259,13 @@ const Live: React.FC<LiveProps> = ({ setSavedTranscripts }) => {
       {missingPrep && <p className="live-note">No {missingPrep} loaded, so answers will be general. Add it in prep before your next session.</p>}
       {!ending && audioProblem && <section className="live-audio"><AudioStatus health={audioHealth} source={audioSource} /></section>}
       {transcriber.error && <div role="alert" className="alert alert--error">{transcriber.error}</div>}
-      {ai.error && <div role="alert" className="alert alert--error">{ai.error}<button className="btn btn--ghost" onClick={ai.retry} disabled={ending}>Retry answer</button></div>}
+      {ai.error && <div role="alert" className="alert alert--error">{ai.error}{needsScreenPermission(ai.error) && <PrivacySettingsButton pane="screen" />}<button className="btn btn--ghost" onClick={ai.retry} disabled={ending}>Retry answer</button></div>}
       <section className="assist-card assist-card--active" aria-busy={ai.busy}>
         {shownQuestion && <p className="heard-question">{shownQuestion}</p>}
         <div className="assist-body" aria-live="polite">{askedQuestion ? ai.answer || (ai.busy ? "Preparing your answer…" : "Ready for the next question.") : <span className="placeholder">{waitingText}</span>}</div>
         <div className="response-actions">{ai.busy ? <button className="btn btn--ghost" onClick={ai.cancel}>Stop</button> : askedQuestion && ai.answer && <button className="btn btn--ghost" onClick={() => { navigator.clipboard.writeText(ai.answer).then(() => setCopied(true)).catch(() => setError("Couldn't copy the answer.")); }}>{copied ? "Copied" : "Copy"}</button>}</div>
       </section>
-      <div className="live-command"><input ref={inputRef} value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); ask(); } }} placeholder="Type a question…" aria-label="Ask Cue" /><button className={includeScreen ? "context-toggle context-toggle--on" : "context-toggle"} onClick={() => setIncludeScreen(v => !v)} aria-label="Include screen" aria-pressed={includeScreen} title="Include a screenshot with your next typed question">◫</button><button className="send-btn" onClick={ask} disabled={!question.trim() || ending} aria-label="Send question">↑</button></div>
+      <div className="live-command"><input ref={inputRef} value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); ask(); } }} placeholder="Type a question…" aria-label="Ask Cue" /><button className={includeScreen ? "context-toggle context-toggle--on" : "context-toggle"} onClick={toggleScreen} aria-label="Include screen" aria-pressed={includeScreen} title="Let Cue see your screen when answering, e.g. for coding problems">◫</button><button className="send-btn" onClick={ask} disabled={!question.trim() || ending} aria-label="Send question">↑</button></div>
       <div className="live-actions">
         {ACTIONS.map(action => <button key={action.mode} className="action-chip" disabled={ending} title={action.title} onClick={() => trigger(action.mode)}>{action.label}{action.mode === "answer" && <kbd>⌘J</kbd>}</button>)}
         <label className="auto-control" title="Answer automatically when a question is detected"><span>Auto</span><input type="checkbox" className="switch" checked={autoMode} onChange={e => setAutoMode(e.target.checked)} aria-label="Auto-answer" /></label>

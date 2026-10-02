@@ -1,6 +1,7 @@
 import React from "react";
 import { AudioHealth, CALL_AUDIO_HELP } from "../callAudio";
 import { AudioSource } from "../interview";
+import PrivacySettingsButton from "./PrivacySettingsButton";
 
 export default function AudioStatus({ health, source }: { health: AudioHealth; source: AudioSource }) {
   const call = source === "system";
@@ -19,5 +20,6 @@ export default function AudioStatus({ health, source }: { health: AudioHealth; s
     <meter aria-label={call ? "Call audio level" : "Microphone audio level"} min={0} max={100} value={health.level} />
     {health.deviceChanged && <p className="small muted">Audio devices changed. Play the Teams/Zoom speaker test again; reconnect if the meter stays still.</p>}
     {needsAttention && <p className="small muted">{call ? `If the interviewer or speaker test is playing and the meter stays still, reconnect audio. ${CALL_AUDIO_HELP}` : "Speak near the selected microphone. Check its permission and reconnect if the meter stays still."}</p>}
+    {needsAttention && call && <PrivacySettingsButton pane="audio" />}
   </div>;
 }

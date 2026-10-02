@@ -30,6 +30,13 @@ test("live answers must be speakable with no placeholders", () => {
   assert.match(INTERVIEW_SYSTEM, /plain text with no markdown/);
 });
 
+test("coding problems on screen get an approach, full code, and complexity", () => {
+  assert.match(INTERVIEW_SYSTEM, /LeetCode-style problem in the screenshot/);
+  assert.match(INTERVIEW_SYSTEM, /complete, correct solution code in the language shown on screen/);
+  assert.match(INTERVIEW_SYSTEM, /time and space complexity/);
+  assert.match(INTERVIEW_SYSTEM, /word limit does not apply to the code/);
+});
+
 test("live prompts retain original preparation after live history has rolled over", () => {
   const context = { resume: "Built an inventory service", jobDescription: "Backend reliability", notes: "Prefer concise responses", prepConversation: [{ role: "user", text: "Correction: I led two engineers, not ten." }] };
   const prompt = buildInterviewPrompt({ kind: "live", mode: "answer", context, question: "Tell me about leadership", transcript: "An interviewer asks about leadership", history: Array.from({ length: 40 }, (_, i) => ({ role: "user", text: `turn ${i}` })) });

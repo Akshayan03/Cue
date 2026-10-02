@@ -1,13 +1,25 @@
 import { MeetingBrief } from "./types";
 import { InterviewContext, ChatTurn } from "./interview";
 
+export type PrivacyPane = "audio" | "screen";
 export type CoachMode = "say" | "answer" | "followup" | "objection";
 
 export interface ElectronAPI {
   isElectron: true;
+  platform?: string;
   checkInterviewConnection: () => Promise<{ connected: boolean; model: string; version: string; subscription: string }>;
+  claudeStatus?: () => Promise<ClaudeStatus>;
+  installClaude?: () => Promise<void>;
+  loginClaude?: () => Promise<ClaudeStatus>;
+  submitClaudeLoginCode?: (code: string) => Promise<void>;
+  openClaudeLogin?: () => Promise<void>;
+  cancelClaudeLogin?: () => Promise<void>;
+  onClaudeLoginUrl?: (cb: () => void) => () => void;
   audioSupport: () => Promise<{ platform: string; supported: boolean; screenPermission: string }>;
   prepareAudioCapture: () => Promise<void>;
+  promptAudioPermission?: () => Promise<void>;
+  openPrivacySettings?: (pane: PrivacyPane) => Promise<void>;
+  checkScreen?: () => Promise<string | null>;
   importDocument: () => Promise<{ name: string; text: string } | null>;
   respond: (payload: { id: string; context: InterviewContext; history: ChatTurn[]; transcript?: string; question: string; kind: "prep" | "live"; mode?: CoachMode; includeScreen?: boolean }) => Promise<void>;
   cancelResponse: (id?: string) => Promise<void>;
@@ -38,6 +50,13 @@ export interface ElectronAPI {
     coachProfile?: "general" | "sales" | "interview" | "coding";
     customInstructions?: string;
   }) => Promise<ProviderSettings>;
+}
+
+/** Where the user is in connecting their Claude account. */
+export interface ClaudeStatus {
+  step: "install" | "update" | "signin" | "ready";
+  version?: string;
+  subscription?: string;
 }
 
 export interface ProviderSettings {

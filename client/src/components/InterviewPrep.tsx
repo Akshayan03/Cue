@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AudioSource, InterviewContext } from "../interview";
 import { useInterviewAI } from "../useInterviewAI";
 import { useTranscriber } from "../useTranscriber";
-import { openInterviewAudio, stopAudioCapture } from "../callAudio";
+import { needsAudioPermission, openInterviewAudio, stopAudioCapture } from "../callAudio";
 import { useAudioHealth } from "../useAudioHealth";
 import AudioStatus from "./AudioStatus";
+import PrivacySettingsButton from "./PrivacySettingsButton";
+import ClaudeConnect from "./ClaudeConnect";
 
 interface Props {
   context: InterviewContext;
@@ -18,7 +20,6 @@ interface Props {
 }
 
 export default function InterviewPrep({ context, setContext, ai, audioSource, setAudioSource, starting, onStart, onReset }: Props) {
-  const [connection, setConnection] = useState("Checking your Claude account…");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -41,27 +42,14 @@ export default function InterviewPrep({ context, setContext, ai, audioSource, se
     checkStreamRef.current = null;
   }, []);
 
-  const checkConnection = () => {
-    setReady(false);
-    setConnection("Checking your Claude account…");
-    window.electron?.checkInterviewConnection().then((result) => {
-      if (!alive.current) return;
-      setReady(true);
-      setConnection(`Claude account · ${result.subscription} · Opus 5.5`);
-    }).catch((e) => {
-      if (alive.current) setConnection(e.message || "Sign in to Claude Code to continue.");
-    });
-  };
-
   useEffect(() => {
     alive.current = true;
-    checkConnection();
     return () => {
       alive.current = false;
       streamRef.current?.getTracks().forEach(t => t.stop());
       cancelAudioCheck();
     };
-  }, [cancelAudioCheck]); // connection is checked once per preparation screen
+  }, [cancelAudioCheck]);
 
   const stopCheck = useCallback(() => {
     cancelAudioCheck();
@@ -148,11 +136,7 @@ export default function InterviewPrep({ context, setContext, ai, audioSource, se
       <h1>Give Cue your story.</h1>
       <p>Your experience. Their role. Answers that connect the two.</p>
     </header>
-    <div className={ready ? "connection-card connection-card--ready" : "connection-card"}>
-      <span>{ready ? "●" : "○"} {connection}</span>
-      {!ready && <button className="btn btn--ghost" onClick={checkConnection}>Recheck</button>}
-    </div>
-    <p className="small muted">Uses your signed-in Claude account. Opus 5.5 access is confirmed when a response succeeds.</p>
+    <ClaudeConnect onReady={() => setReady(true)} />
     <label className="field">
       <span>Interview / role</span>
       <input value={context.title} maxLength={200} onChange={e => setField("title", e.target.value)} placeholder="Senior engineer · Company name" />
@@ -184,7 +168,7 @@ export default function InterviewPrep({ context, setContext, ai, audioSource, se
       {recording && <p className="small muted">{voice.status === "loading" ? "Preparing on-device speech recognition…" : "Listening — your words appear above."}</p>}
       {voice.error && <div className="alert alert--error">{voice.error}</div>}
     </section>
-    {error && <div role="alert" className="alert alert--error">{error}</div>}
+    {error && <div role="alert" className="alert alert--error">{error}{needsAudioPermission(error) && <PrivacySettingsButton pane="audio" />}</div>}
     <label className="field"><span>Listen to</span><select value={audioSource} onChange={e => setAudioSource(e.target.value as AudioSource)} disabled={starting || recording || dictating}><option value="system">Teams / Zoom / call audio (headphones OK)</option><option value="microphone">Microphone / in-person conversation</option></select></label>
     <section className="audio-check">
       <div className="card-head"><h2>Check your audio</h2><button className="btn" disabled={starting || recording || dictating} onClick={testAudio}>{checkingAudio ? "Cancel audio check" : checkStream ? "Stop audio check" : audioSource === "system" ? "Test call audio" : "Test microphone"}</button></div>

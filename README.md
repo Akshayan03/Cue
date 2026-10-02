@@ -24,12 +24,16 @@ Every interview starts with a preparation screen:
    conversations. Call mode does not mix in your microphone.
 4. Start the session. Cue carries the documents and prep conversation into live answers.
    Auto-answer detects questions and prompts such as “tell me about…” after an audio pause.
-   You can also type a question or use `⌘J`. Screenshots are opt-in for typed questions.
+   You can also type a question or use `⌘J`. Turn on screen context (◫) for coding rounds:
+   every answer then includes a screenshot of the display under your cursor, so when the
+   interviewer says "solve this problem", Cue reads it and replies with the approach, full code,
+   and complexity. It needs Screen Recording permission and is off by default.
 
 Interview preparation and live answers use **`claude-opus-5-5` through your Claude Code
-subscription login**, without an API-key fallback. Install Claude Code **2.1.280 or newer**
-and sign in with `claude auth login`. An account-status check does not prove that an OAuth
-token is still valid; a successful response verifies access. Renew your login if it expires.
+subscription login**, without an API-key fallback. Cue installs Claude Code (2.1.280 or newer)
+and signs you in from the app; see [Connecting to Claude](#connecting-to-claude). An
+account-status check does not prove that an OAuth token is still valid; a successful response
+verifies access. If your login expires, choose **Sign in again** in Settings.
 
 Live responses stream with low effort; prep uses medium effort. Time to first text is measured
 in the UI, not guaranteed: model access, network conditions, Claude usage limits, and local
@@ -79,34 +83,44 @@ References: [Electron capture permissions](https://www.electronjs.org/docs/lates
 
 ## Download
 
-**[⬇ Download the latest release for macOS & Windows](https://github.com/Akshayan03/Cue/releases/latest)**
+**[⬇ Download page](https://akshayan03.github.io/Cue/)** · [all releases](https://github.com/Akshayan03/Cue/releases/latest)
 
-- **macOS:** download the `.zip` for your chip (`arm64` = Apple Silicon, plain = Intel), unzip,
-  and drag **Cue.app** to Applications. The build isn't notarized yet, so macOS will claim the
-  app is **"damaged"** — it isn't; clear the quarantine flag and it opens normally:
+**macOS, easiest:** open Terminal, paste this, and press Return. It downloads the right build for
+your Mac, installs it in Applications, and opens Cue:
 
-  ```bash
-  xattr -cr /Applications/Cue.app
-  ```
-- **Windows:** run `Cue-Setup-<version>.exe`. SmartScreen may warn (unsigned) — choose
-  *More info → Run anyway*.
+```bash
+curl -fsSL https://akshayan03.github.io/Cue/install.sh | bash
+```
 
-### Connecting to Claude — two options
+**macOS, manual:** download the `.zip` for your chip (`arm64` = Apple Silicon, plain = Intel),
+unzip, and drag **Cue.app** to Applications. Cue isn't notarized yet, so the first time you open
+it macOS says it can't verify the developer: click **Done**, then go to **System Settings →
+Privacy & Security** and click **Open Anyway**.
 
-Cue reaches Claude one of two ways; pick either in **Settings** (the gear in the app):
+**Windows:** run `Cue-Setup-<version>.exe`. If SmartScreen warns (the build is unsigned), choose
+*More info → Run anyway*.
 
-1. **Claude Code CLI** — install [Claude Code](https://code.claude.com/docs/en/overview)
-   2.1.280 or newer and sign in (`claude auth login`). Cue uses your own account and its usage
-   limits. No API key is bundled; subscription/model eligibility still applies.
-2. **Your own Anthropic API key** — paste a key from
-   [console.anthropic.com](https://console.anthropic.com/settings/keys). It's stored **encrypted
-   on your device** via the OS keychain and is sent only to Anthropic, never to any Cue server.
+### Connecting to Claude
 
-**Nothing is bundled** — there's no shared/built-in API key. On first launch, Cue detects whether
-the CLI is present and walks you through whichever option you choose.
+The first time you open Cue, it walks you through connecting your own Claude account, with no
+Terminal:
 
-The provider selection applies to the screen assistant and meeting briefs. Interview prep and
-live interview responses always use the Claude subscription with Opus 5.5.
+1. **Install Claude Code:** click the button and Cue runs Anthropic's official installer (about
+   2 minutes, no admin password).
+2. **Sign in with Claude:** approve in your browser and Cue connects automatically. If claude.ai
+   shows you a code instead, paste it into Cue.
+
+Use the Claude account you already pay for (Pro, Max, Team, or Enterprise). Claude Code 2.1.280 or
+newer is required; Cue offers to update an older copy. If your login expires, choose **Sign in
+again** in Settings.
+
+Alternatively, paste **your own Anthropic API key** from
+[console.anthropic.com](https://console.anthropic.com/settings/keys) in Settings. It's stored
+**encrypted on your device** via the OS keychain and is sent only to Anthropic, never to any Cue
+server. The API key applies to the screen assistant and meeting briefs; interview prep and live
+interview responses always use your Claude subscription with Opus 5.5.
+
+**Nothing is bundled:** there's no shared or built-in API key.
 
 > ⚖️ **Before you record anyone, read [`TERMS.md`](./TERMS.md) and [`PRIVACY.md`](./PRIVACY.md).**
 > Recording meetings can be subject to all-party-consent (wiretapping) laws. You are responsible
@@ -148,6 +162,11 @@ yarn --cwd client install     # the React UI (client is a yarn project)
 # Launch — starts the React dev server and the Electron overlay together
 npm run dev
 ```
+
+On macOS, `npm run dev` launches Electron through LaunchServices so it asks for call-audio
+permission itself; it appears as **Electron** under System Audio Recording Only. Starting the
+Electron binary directly from a terminal makes macOS check the terminal app instead, which
+silently blocks call audio.
 
 Run checks with `npm test` and `CI=true npm test --prefix client -- --watchAll=false --runInBand`.
 

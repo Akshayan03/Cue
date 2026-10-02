@@ -3,9 +3,25 @@ const { contextBridge, ipcRenderer } = require("electron");
 // Safe bridge between the overlay UI (renderer) and the native main process.
 contextBridge.exposeInMainWorld("electron", {
   isElectron: true,
+  platform: process.platform,
   checkInterviewConnection: () => ipcRenderer.invoke("session:check"),
+  // Connecting Claude: install Claude Code, then sign in through the browser.
+  claudeStatus: () => ipcRenderer.invoke("claude:status"),
+  installClaude: () => ipcRenderer.invoke("claude:install"),
+  loginClaude: () => ipcRenderer.invoke("claude:login"),
+  submitClaudeLoginCode: (code) => ipcRenderer.invoke("claude:login-code", code),
+  openClaudeLogin: () => ipcRenderer.invoke("claude:login-open"),
+  cancelClaudeLogin: () => ipcRenderer.invoke("claude:login-cancel"),
+  onClaudeLoginUrl: (cb) => {
+    const h = () => cb();
+    ipcRenderer.on("claude:login-url", h);
+    return () => ipcRenderer.removeListener("claude:login-url", h);
+  },
   audioSupport: () => ipcRenderer.invoke("audio:support"),
   prepareAudioCapture: () => ipcRenderer.invoke("capture:audio-only"),
+  promptAudioPermission: () => ipcRenderer.invoke("audio:permission-prompt"),
+  openPrivacySettings: (pane) => ipcRenderer.invoke("privacy:open-settings", pane),
+  checkScreen: () => ipcRenderer.invoke("screen:check"),
   importDocument: () => ipcRenderer.invoke("document:import"),
   respond: (payload) => ipcRenderer.invoke("session:respond", payload),
   cancelResponse: (id) => ipcRenderer.invoke("session:cancel", id),

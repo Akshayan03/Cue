@@ -28,7 +28,7 @@ beforeEach(() => {
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: media });
   global.AudioContext = FakeContext as any;
   global.MediaStream = class { constructor(public tracks: unknown[]) {} } as any;
-  window.electron = { audioSupport: jest.fn().mockResolvedValue({ supported: true, screenPermission: "granted" }), prepareAudioCapture: jest.fn().mockResolvedValue(undefined), ensureMic: jest.fn().mockResolvedValue("granted") } as any;
+  window.electron = { audioSupport: jest.fn().mockResolvedValue({ supported: true, screenPermission: "granted" }), prepareAudioCapture: jest.fn().mockResolvedValue(undefined), promptAudioPermission: jest.fn().mockResolvedValue(undefined), ensureMic: jest.fn().mockResolvedValue("granted") } as any;
 });
 afterEach(() => { jest.useRealTimers(); delete window.electron; });
 
@@ -49,10 +49,18 @@ test("call audio does not depend on Screen Recording; unsupported systems and en
   (window.electron?.audioSupport as jest.Mock).mockResolvedValueOnce({ supported: false, screenPermission: "granted" });
   await expect(openInterviewAudio("system")).rejects.toThrow(/macOS 14\.2/);
   expect(media.getDisplayMedia).toHaveBeenCalledTimes(1);
+  expect(window.electron?.promptAudioPermission).not.toHaveBeenCalled();
   audio.readyState = "ended";
   await expect(openInterviewAudio("system")).rejects.toThrow(/already ended.*System Audio Recording Only/);
+  expect(window.electron?.promptAudioPermission).toHaveBeenCalledTimes(1);
   expect(video.stop).toHaveBeenCalled();
   expect(media.getUserMedia).not.toHaveBeenCalled();
+});
+
+test("a failed system capture prompts to open System Audio Recording settings", async () => {
+  media.getDisplayMedia.mockRejectedValueOnce(new Error("Permission denied"));
+  await expect(openInterviewAudio("system")).rejects.toThrow(/Permission denied.*System Audio Recording Only/);
+  expect(window.electron?.promptAudioPermission).toHaveBeenCalledTimes(1);
 });
 
 test("microphone mode remains explicit and separate from system audio", async () => {

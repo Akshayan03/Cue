@@ -239,6 +239,10 @@
   .term-body .g { color:#7ee2a8; }
   .term-body .y { color:#ffd479; }
   .term-body b { color:#fff; font-weight:600; }
+  .term-body .cmd { color:#fff; word-break:break-all; }
+  .copy-btn { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--text); background:rgba(130,175,255,.12); border:1px solid rgba(130,175,255,.35); border-radius:7px; padding:4px 12px; cursor:pointer; }
+  .copy-btn:hover { background:rgba(130,175,255,.22); }
+  .opt b { color:var(--text); font-weight:600; }
 
   /* setup cards */
   .two { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; }
@@ -389,21 +393,20 @@
 
 <section class="wrap rv" id="install">
   <div class="sec-kicker">// install</div>
-  <h2>Unzip, open, done.</h2>
-  <p class="sec-sub">Builds aren't notarized by Apple yet, so macOS flags the download as "damaged" — it isn't. One Terminal command clears the quarantine flag; after that it opens like any other app.</p>
+  <h2>Two steps. That's it.</h2>
+  <p class="sec-sub">Install Cue, then connect your Claude account from inside the app. Cue sets up everything else for you.</p>
   <div class="term">
     <div class="term-bar">
       <span class="tl" style="background:#ff5f57"></span>
       <span class="tl" style="background:#febc2e"></span>
       <span class="tl" style="background:#28c840"></span>
-      <span class="term-title">macOS — install.log</span>
+      <span class="term-title">macOS · easiest · paste into Terminal</span>
+      <button class="copy-btn" id="copy-install" type="button">Copy</button>
     </div>
     <div class="term-body">
-      <span class="c"># 1.</span> download the <b>.zip</b> for your chip — <b>arm64</b> = Apple Silicon, plain = Intel<br>
-      <span class="c"># 2.</span> unzip → drag <b>Cue.app</b> into <b>Applications</b><br>
-      <span class="c"># 3.</span> if macOS says <b>"Cue is damaged"</b> — it isn't; clear the quarantine flag:<br>
-      <span class="y">$</span> xattr -cr /Applications/Cue.app<br>
-      <span class="g">✓</span> open Cue and press <b>⌘ \</b> · grant <b>Screen Recording + Microphone</b> when asked
+      <span class="c"># open Terminal (⌘ Space, type "Terminal"), paste this, press Return</span><br>
+      <span class="y">$</span> <span class="cmd" id="install-cmd">curl -fsSL https://akshayan03.github.io/Cue/install.sh | bash</span><br>
+      <span class="g">✓</span> picks the right version for your Mac, installs it, and opens Cue
     </div>
   </div>
   <div class="term">
@@ -411,34 +414,47 @@
       <span class="tl" style="background:#ff5f57"></span>
       <span class="tl" style="background:#febc2e"></span>
       <span class="tl" style="background:#28c840"></span>
-      <span class="term-title">windows — install.log</span>
+      <span class="term-title">macOS · or download it yourself</span>
     </div>
     <div class="term-body">
-      <span class="c"># 1.</span> run <b>Cue-Setup-&lt;version&gt;.exe</b><br>
-      <span class="c"># 2.</span> SmartScreen may warn → <b>More info → Run anyway</b><br>
-      <span class="g">✓</span> press <b>Ctrl \</b> to summon the overlay
+      <span class="c"># 1.</span> click <b>Download for Mac</b> (or <b>Mac Intel</b>), open the <b>.zip</b>, drag <b>Cue</b> into <b>Applications</b><br>
+      <span class="c"># 2.</span> open Cue · if macOS says it can't verify Cue, click <b>Done</b><br>
+      <span class="c"># 3.</span> go to <b>System Settings → Privacy &amp; Security</b>, scroll down, click <b>Open Anyway</b><br>
+      <span class="g">✓</span> Cue opens · Apple asks this because Cue isn't notarized yet
+    </div>
+  </div>
+  <div class="term">
+    <div class="term-bar">
+      <span class="tl" style="background:#ff5f57"></span>
+      <span class="tl" style="background:#febc2e"></span>
+      <span class="tl" style="background:#28c840"></span>
+      <span class="term-title">windows</span>
+    </div>
+    <div class="term-body">
+      <span class="c"># 1.</span> click <b>Windows</b> above and run <b>Cue-Setup.exe</b><br>
+      <span class="c"># 2.</span> if you see "Windows protected your PC", click <b>More info → Run anyway</b><br>
+      <span class="g">✓</span> Cue opens · press <b>Ctrl \</b> to show or hide it
     </div>
   </div>
 </section>
 
-<section class="wrap rv">
-  <div class="sec-kicker">// bring your own claude</div>
-  <h2>Two ways to power it.</h2>
+<section class="wrap rv" id="connect">
+  <div class="sec-kicker">// connect claude</div>
+  <h2>Runs on your own Claude account.</h2>
+  <p class="sec-sub">The first time you open Cue, it walks you through this. No Terminal and no API keys.</p>
   <div class="two">
     <div class="opt">
-      <span class="tag">Option A · Subscription</span>
-      <h3>Claude Code CLI</h3>
-      <p>Already pay for Claude? Install the <a href="https://docs.claude.com/en/docs/claude-code/overview">Claude Code CLI</a> and log in once:</p>
-      <p><code>npm i -g @anthropic-ai/claude-code</code> → run <code>claude</code></p>
-      <p>Cue auto-detects it. No API billing — it rides your existing subscription.</p>
+      <span class="tag">Step 1</span>
+      <h3>Install Claude Code</h3>
+      <p>Click <b>Install Claude Code</b> in Cue. It installs Anthropic's free helper app in about 2 minutes, with no admin password.</p>
     </div>
     <div class="opt">
-      <span class="tag">Option B · API key</span>
-      <h3>Anthropic API</h3>
-      <p>Grab a key at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a> and paste it into Cue's Settings (the gear in the overlay). Pay-per-use on your Anthropic account.</p>
-      <p>Stored <b>encrypted via your OS keychain</b> — sent only to Anthropic, never to any Cue server.</p>
+      <span class="tag">Step 2</span>
+      <h3>Sign in with Claude</h3>
+      <p>Click <b>Sign in with Claude</b> and approve in your browser. Use the Claude account you already pay for (Pro, Max, Team, or Enterprise).</p>
     </div>
   </div>
+  <p class="consent">Prefer an API key? Paste one from <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a> into Cue's Settings for the screen assistant and meeting notes. It's stored encrypted in your OS keychain. Interview answers always use your Claude account.</p>
 </section>
 
 <section class="wrap rv">
@@ -492,6 +508,16 @@
       }
     })
     .catch(function () { /* keep the releases-page fallback links */ });
+
+  /* ---- copy the one-line installer ---- */
+  var copyBtn = document.getElementById("copy-install");
+  if (copyBtn) copyBtn.addEventListener("click", function () {
+    var text = document.getElementById("install-cmd").textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      copyBtn.textContent = "Copied";
+      setTimeout(function () { copyBtn.textContent = "Copy"; }, 1800);
+    }).catch(function () {});
+  });
 
   /* ---- typed demo suggestion ---- */
   var messages = [

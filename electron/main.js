@@ -20,6 +20,7 @@ const {
   net,
   systemPreferences,
   dialog,
+  shell,
 } = require("electron");
 const { pathToFileURL } = require("url");
 
@@ -65,15 +66,16 @@ const workDir = path.join(os.tmpdir(), "cue-copilot");
 fs.mkdirSync(workDir, { recursive: true });
 
 function resolveClaudeBin() {
+  const exe = process.platform === "win32" ? "claude.exe" : "claude";
   const candidates = [
     process.env.CLAUDE_BIN,
-    path.join(os.homedir(), ".local", "bin", "claude"), // native installer default
-    path.join(os.homedir(), ".claude", "local", "claude"),
+    path.join(os.homedir(), ".local", "bin", exe), // native installer default
+    path.join(os.homedir(), ".claude", "local", exe),
     "/opt/homebrew/bin/claude",
     "/usr/local/bin/claude",
     // A packaged app launched from Finder gets a minimal PATH, but scan it anyway
     // to catch npm-global and version-manager installs when launched from a shell.
-    ...(process.env.PATH || "").split(path.delimiter).filter(Boolean).map((d) => path.join(d, "claude")),
+    ...(process.env.PATH || "").split(path.delimiter).filter(Boolean).map((d) => path.join(d, exe)),
   ].filter(Boolean);
   for (const c of candidates) {
     try {
@@ -84,7 +86,12 @@ function resolveClaudeBin() {
   }
   return { bin: "claude", found: false }; // fall back to PATH (may or may not exist)
 }
-const { bin: CLAUDE_BIN, found: CLI_FOUND } = resolveClaudeBin();
+let { bin: CLAUDE_BIN, found: CLI_FOUND } = resolveClaudeBin();
+// Claude Code can be installed while Cue is open (including from Cue itself),
+// so look again whenever the connection is checked.
+function refreshClaude() {
+  ({ bin: CLAUDE_BIN, found: CLI_FOUND } = resolveClaudeBin());
+}
 
 // ---- Settings (provider choice + encrypted API key) ----
 // Persisted in userData so the choice survives restarts. The API key is encrypted
@@ -388,8 +395,16 @@ function screenPermissionGranted() {
   }
 }
 
+// Unpackaged builds run as the stock Electron app, so that's the name macOS lists.
+const APP_LABEL = app.isPackaged ? "Cue" : "Electron";
+
 const SCREEN_PERM_ERROR =
-  "Cue can't see your screen yet. Enable it in System Settings → Privacy & Security → Screen & System Audio Recording (Cue should appear in the list after this attempt), then quit and reopen Cue. Asking without \"include a screenshot\" works in the meantime.";
+  `Cue can't see your screen yet. Turn on ${APP_LABEL} in System Settings → Privacy & Security → Screen & System Audio Recording, then quit and reopen ${APP_LABEL}. Answers without the screen work in the meantime.`;
+
+// A capture attempt is what makes macOS list the app (and prompt the first time).
+function requestScreenAccess() {
+  desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => {});
+}
 
 // Never let a capture hang a request — resolve null after a short deadline.
 function withTimeout(promise, ms) {
@@ -401,27 +416,33 @@ function withTimeout(promise, ms) {
 // clobber each other's screenshot, and so a local attacker can't pre-plant a
 // symlink at a predictable path. The caller deletes the file when done.
 async function captureScreenshotToFile() {
-  const { width, height } = screen.getPrimaryDisplay().size;
+  const png = await captureActiveDisplayPng();
+  if (!png) return null;
+  const name = `shot-${crypto.randomBytes(8).toString("hex")}.png`;
+  fs.writeFileSync(path.join(workDir, name), png);
+  return name; // relative to workDir (the CLI's cwd)
+}
+
+// Capture the display the user is working on (the one under the cursor), so a
+// problem on a second monitor is what Claude sees. Cue's own overlay is
+// content-protected and never appears in the capture.
+async function captureActiveDisplayPng() {
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { width, height } = display.size;
   const sources = await desktopCapturer.getSources({
     types: ["screen"],
     thumbnailSize: { width, height },
   });
   if (!sources.length) return null;
-  const name = `shot-${crypto.randomBytes(8).toString("hex")}.png`;
-  fs.writeFileSync(path.join(workDir, name), sources[0].thumbnail.toPNG());
-  return name; // relative to workDir (the CLI's cwd)
+  const source = sources.find(s => s.display_id === String(display.id)) || sources[0];
+  return source.thumbnail.toPNG();
 }
 
 // Capture the primary display as a base64 PNG (no temp file) — used by the API
 // path, which sends the image inline rather than having a tool read it off disk.
 async function captureScreenshotBase64() {
-  const { width, height } = screen.getPrimaryDisplay().size;
-  const sources = await desktopCapturer.getSources({
-    types: ["screen"],
-    thumbnailSize: { width, height },
-  });
-  if (!sources.length) return null;
-  return sources[0].thumbnail.toPNG().toString("base64");
+  const png = await captureActiveDisplayPng();
+  return png ? png.toString("base64") : null;
 }
 
 // One in-flight request per channel, regardless of provider. A new request
@@ -542,7 +563,7 @@ function streamCli(event, prefix, { prompt, system, allowRead, readFile, onClose
     if (child.superseded) return; // a newer request replaced this one — stay quiet
     if (resultError) {
       const message = /OAuth|authenticate|authentication|401/i.test(resultError)
-        ? "Your Claude login needs to be renewed. Run claude auth login in Terminal, complete sign-in, then retry. " + resultError
+        ? "Your Claude login needs to be renewed. Open Settings, choose Sign in again, then retry. " + resultError
         : resultError;
       return event.sender.send(`${prefix}:error`, message);
     }
@@ -680,9 +701,7 @@ ipcMain.handle("ask", async (event, { question, includeScreen }) => {
   // capturing would hang or return black frames. The capture attempt below
   // also makes Cue show up in the System Settings permission list.
   if (includeScreen && !screenPermissionGranted()) {
-    desktopCapturer
-      .getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } })
-      .catch(() => {});
+    requestScreenAccess();
     return event.sender.send("ask:error", SCREEN_PERM_ERROR);
   }
 
@@ -845,22 +864,121 @@ ipcMain.handle("worker:source", () =>
 );
 
 // ---- Settings / provider status (for onboarding) ----
-async function checkInterviewConnection() {
-  if (!CLI_FOUND) throw new Error("Install Claude Code and sign in with claude auth login first.");
+// Which setup step the user is on: install Claude Code, update it, sign in, or ready.
+async function claudeStatus() {
+  refreshClaude();
+  if (!CLI_FOUND) return { step: "install" };
   const options = { cwd: workDir, env: oauthEnvironment(), timeout: 12000, maxBuffer: 1024 * 1024 };
-  const [{ stdout: version }, { stdout: authText }] = await Promise.all([
-    execFileAsync(CLAUDE_BIN, ["--version"], options),
-    execFileAsync(CLAUDE_BIN, ["auth", "status", "--json"], options),
-  ]);
-  const auth = JSON.parse(authText);
-  if (!auth.loggedIn || auth.authMethod !== "claude.ai" || auth.apiProvider !== "firstParty") {
-    throw new Error("Sign in to your Claude subscription using claude auth login. Interview sessions require your Claude account.");
+  let version;
+  try {
+    version = (await execFileAsync(CLAUDE_BIN, ["--version"], options)).stdout.trim();
+  } catch {
+    return { step: "install" }; // a broken install is fixed by reinstalling
   }
-  if (!supportsOpus(version)) throw new Error(`Opus 5.5 needs Claude Code ${MIN_CLI_VERSION} or later. Run claude update, then reopen Cue.`);
-  return { connected: true, model: OPUS_MODEL, version: version.trim(), subscription: auth.subscriptionType || "Claude account" };
+  if (!supportsOpus(version)) return { step: "update", version };
+  let auth = {};
+  try {
+    auth = JSON.parse((await execFileAsync(CLAUDE_BIN, ["auth", "status", "--json"], options)).stdout);
+  } catch (err) {
+    // `auth status` exits non-zero when signed out but still prints its JSON.
+    try { auth = JSON.parse(err.stdout); } catch { /* treat as signed out */ }
+  }
+  if (!auth.loggedIn || auth.authMethod !== "claude.ai" || auth.apiProvider !== "firstParty") return { step: "signin", version };
+  return { step: "ready", version, subscription: auth.subscriptionType || "Claude account" };
+}
+
+async function checkInterviewConnection() {
+  const status = await claudeStatus();
+  if (status.step === "install") throw new Error("Install Claude Code to connect your Claude account.");
+  if (status.step === "update") throw new Error(`Opus 5.5 needs Claude Code ${MIN_CLI_VERSION} or later. Update Claude Code to continue.`);
+  if (status.step === "signin") throw new Error("Sign in with your Claude subscription account to continue. Interview sessions require your Claude account.");
+  return { connected: true, model: OPUS_MODEL, version: status.version, subscription: status.subscription };
 }
 
 ipcMain.handle("session:check", checkInterviewConnection);
+ipcMain.handle("claude:status", claudeStatus);
+
+const lastLine = (text) => text.replace(/\x1b\[[0-9;]*m/g, "").split("\n").map((l) => l.trim()).filter(Boolean).pop() || "";
+
+// Runs Anthropic's official Claude Code installer (the one-liner from its docs)
+// so connecting Claude never needs a terminal. It installs into the user's home
+// folder and needs no admin password.
+let claudeInstall = null;
+ipcMain.handle("claude:install", () => {
+  claudeInstall ||= new Promise((resolve, reject) => {
+    const [command, args] = process.platform === "win32"
+      ? ["powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "irm https://claude.ai/install.ps1 | iex"]]
+      : ["/bin/bash", ["-c", "curl -fsSL https://claude.ai/install.sh | bash"]];
+    const child = spawn(command, args, { cwd: os.homedir(), env: oauthEnvironment() });
+    let output = "";
+    const collect = (data) => { output = (output + data).slice(-8000); };
+    child.stdout.on("data", collect);
+    child.stderr.on("data", collect);
+    const timer = setTimeout(() => child.kill(), 10 * 60_000);
+    child.on("error", (err) => { clearTimeout(timer); reject(err); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      refreshClaude();
+      if (code === 0 && CLI_FOUND) resolve();
+      else reject(new Error(`Claude Code didn't install. ${lastLine(output) || "Check your internet connection and try again."}`));
+    });
+  }).finally(() => { claudeInstall = null; });
+  return claudeInstall;
+});
+
+// Sign-in is Claude Code's own browser OAuth. The CLI finishes by itself when
+// the browser hands the login back; when it can't, claude.ai shows a code the
+// user pastes into Cue, which is forwarded to the CLI.
+let claudeLogin = null;
+let claudeLoginUrl = null;
+const isClaudeUrl = (value) => {
+  try {
+    const { protocol, hostname } = new URL(value);
+    return protocol === "https:" && /(^|\.)(claude\.com|claude\.ai|anthropic\.com)$/.test(hostname);
+  } catch {
+    return false;
+  }
+};
+ipcMain.handle("claude:login", async (event) => {
+  refreshClaude();
+  if (!CLI_FOUND) throw new Error("Install Claude Code first.");
+  if (claudeLogin) { claudeLogin.cancelled = true; claudeLogin.kill(); }
+  const child = spawn(CLAUDE_BIN, ["auth", "login", "--claudeai"], { cwd: workDir, env: oauthEnvironment() });
+  claudeLogin = child;
+  claudeLoginUrl = null;
+  // The overlay floats above every window; let the browser come to the front.
+  win?.setAlwaysOnTop(false);
+  let output = "";
+  const read = (data) => {
+    output = (output + data).slice(-8000);
+    const url = [...output.matchAll(/https:\/\/\S+\/oauth\/authorize\S*/g)].map((m) => m[0]).find(isClaudeUrl);
+    if (url && !claudeLoginUrl) {
+      claudeLoginUrl = url;
+      if (!event.sender.isDestroyed()) event.sender.send("claude:login-url");
+    }
+  };
+  child.stdin.on("error", () => {});
+  child.stdout.on("data", read);
+  child.stderr.on("data", read);
+  const timer = setTimeout(() => child.kill(), 10 * 60_000);
+  try {
+    await new Promise((resolve) => { child.on("error", resolve); child.on("close", resolve); });
+  } finally {
+    clearTimeout(timer);
+    if (claudeLogin === child) { claudeLogin = null; claudeLoginUrl = null; }
+    if (win) { win.setAlwaysOnTop(true, "screen-saver"); win.show(); }
+  }
+  const status = await claudeStatus();
+  if (status.step === "ready" || child.cancelled) return status;
+  throw new Error(`Sign-in didn't finish. ${lastLine(output).replace(/^Paste code here if prompted >\s*/, "") || "Try again."}`);
+});
+ipcMain.handle("claude:login-code", (_event, code) => {
+  if (claudeLogin && typeof code === "string" && code.trim()) claudeLogin.stdin.write(`${code.trim()}\n`);
+});
+ipcMain.handle("claude:login-open", () => (claudeLoginUrl ? shell.openExternal(claudeLoginUrl) : undefined));
+ipcMain.handle("claude:login-cancel", () => {
+  if (claudeLogin) { claudeLogin.cancelled = true; claudeLogin.kill(); }
+});
 // macOS system loopback uses Core Audio taps, which arrived in macOS 14.2 (Darwin 23.2).
 function supportsSystemAudio() {
   if (process.platform === "win32") return true;
@@ -876,6 +994,41 @@ ipcMain.handle("audio:support", () => ({
 // Flags the next getDisplayMedia request as call audio only (see the display media handler).
 let audioOnlyCapture = false;
 ipcMain.handle("capture:audio-only", () => { audioOnlyCapture = true; });
+// Deep links to the Privacy & Security panes Cue's errors point at.
+const PRIVACY_PANES = { audio: "Privacy_AudioCapture", screen: "Privacy_ScreenCapture" };
+function openPrivacySettings(pane) {
+  if (process.platform !== "darwin" || !PRIVACY_PANES[pane]) return;
+  return shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${PRIVACY_PANES[pane]}`);
+}
+ipcMain.handle("privacy:open-settings", (_event, pane) => openPrivacySettings(pane));
+// Checked when screen context is switched on, so a missing permission shows
+// up before an answer depends on it. Returns the problem, or null.
+ipcMain.handle("screen:check", () => {
+  if (screenPermissionGranted()) return null;
+  requestScreenAccess();
+  return SCREEN_PERM_ERROR;
+});
+// macOS has no API to query or request System Audio Recording, so when call
+// capture fails, offer to open that exact Settings pane instead of leaving the
+// user to navigate there from the error text.
+let audioPromptOpen = false;
+ipcMain.handle("audio:permission-prompt", async () => {
+  if (process.platform !== "darwin" || audioPromptOpen || !win) return;
+  audioPromptOpen = true;
+  try {
+    const { response } = await dialog.showMessageBox(win, {
+      type: "warning",
+      message: "Cue can't hear your call",
+      detail: `macOS is blocking system audio. Turn on ${APP_LABEL} under Screen & System Audio Recording → System Audio Recording Only, then quit and reopen ${APP_LABEL}.`,
+      buttons: ["Open System Settings", "Not Now"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) await openPrivacySettings("audio");
+  } finally {
+    audioPromptOpen = false;
+  }
+});
 ipcMain.handle("document:import", async () => {
   const result = await dialog.showOpenDialog(win, {
     title: "Add interview context",
@@ -905,7 +1058,10 @@ ipcMain.handle("session:respond", async (event, payload) => {
   try {
     let prompt = buildInterviewPrompt(payload);
     if (payload.includeScreen) {
-      if (!screenPermissionGranted()) throw new Error(SCREEN_PERM_ERROR);
+      if (!screenPermissionGranted()) {
+        requestScreenAccess();
+        throw new Error(SCREEN_PERM_ERROR);
+      }
       // Time out stalled capture, and delete any file that arrives after timeout.
       let captureAbandoned = false;
       const capture = captureScreenshotToFile().then(file => {
@@ -915,7 +1071,7 @@ ipcMain.handle("session:respond", async (event, payload) => {
       try { shotFile = await withTimeout(capture, 8000); }
       catch (err) { captureAbandoned = true; throw err; }
       if (!shotFile) throw new Error("Screen capture failed. Turn off screen context or check Screen Recording permission.");
-      prompt += `\nScreenshot: read ONLY ./${shotFile} as additional reference data.`;
+      prompt += `\nScreenshot of the candidate's screen (it may show the coding problem being discussed): read ONLY ./${shotFile} as additional reference data.`;
     }
     if (sessionRequest !== id) {
       if (shotFile) fs.rm(path.join(workDir, shotFile), { force: true }, () => {});
@@ -940,6 +1096,7 @@ function encryptionStatus(s) {
 }
 
 ipcMain.handle("settings:get", () => {
+  refreshClaude();
   const s = loadSettings();
   return {
     provider: s.provider,

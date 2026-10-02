@@ -38,6 +38,7 @@ beforeEach(() => {
   save = jest.fn();
   window.electron = {
     checkInterviewConnection: jest.fn().mockResolvedValue({ connected: true, model: "claude-opus-5-5", subscription: "max" }),
+    claudeStatus: jest.fn().mockResolvedValue({ step: "ready", version: "2.1.287 (Claude Code)", subscription: "max" }),
     respond: response, cancelResponse: jest.fn().mockResolvedValue(undefined),
     onSessionStream: (listener: typeof emit) => { emit = listener; return jest.fn(); },
     onSessionClear: () => jest.fn(), onCoachTrigger: () => jest.fn(), onAskFocus: () => jest.fn(),
@@ -78,13 +79,39 @@ test("prep documents and chat carry into automatic answers; session end saves fi
 
 test("missing call audio is surfaced without silently switching on the microphone", async () => {
   display.getAudioTracks = () => [];
+  Object.assign(window.electron!, { platform: "darwin", promptAudioPermission: jest.fn().mockResolvedValue(undefined), openPrivacySettings: jest.fn().mockResolvedValue(undefined) });
   renderLive();
   await screen.findByText(/Claude account · max/);
   fireEvent.click(screen.getByRole("button", { name: /Start interview session/ }));
   await screen.findByText(/No call audio was shared/);
+  expect(window.electron?.promptAudioPermission).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(window.electron?.openPrivacySettings).toHaveBeenCalledWith("audio");
   expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
   expect(video.stop).toHaveBeenCalled();
   expect(screen.queryByRole("button", { name: "End" })).not.toBeInTheDocument();
+});
+
+test("with the screen on, every answer includes it; missing Screen Recording turns it off and offers the fix", async () => {
+  const checkScreen = jest.fn().mockResolvedValueOnce("Cue can't see your screen yet. Turn on Electron in System Settings.").mockResolvedValue(null);
+  Object.assign(window.electron!, { platform: "darwin", checkScreen, openPrivacySettings: jest.fn().mockResolvedValue(undefined) });
+  renderLive();
+  await screen.findByText(/Claude account · max/);
+  fireEvent.click(screen.getByRole("button", { name: /Start interview session/ }));
+  await screen.findByRole("button", { name: "End" });
+  await waitFor(() => expect(response).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  expect(response.mock.calls[0][0].includeScreen).toBe(false);
+  const toggle = screen.getByRole("button", { name: "Include screen" });
+  fireEvent.click(toggle);
+  await screen.findByText(/can't see your screen/);
+  expect(toggle).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
+  expect(window.electron?.openPrivacySettings).toHaveBeenCalledWith("screen");
+  fireEvent.click(toggle);
+  await waitFor(() => expect(toggle).toHaveAttribute("aria-pressed", "true"));
+  fireEvent.click(screen.getByRole("button", { name: /^Answer/ }));
+  expect(response).toHaveBeenCalledTimes(2);
+  expect(response.mock.calls[1][0]).toMatchObject({ kind: "live", mode: "answer", includeScreen: true });
 });
 
 test("the pre-call audio check captures system audio without starting AI or transcription", async () => {

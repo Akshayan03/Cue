@@ -458,6 +458,13 @@ input:focus, textarea:focus, select:focus, .text-input:focus {
 .prep-heading p { color: var(--muted); font-size: 12px; }
 .connection-card { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--warn); background: var(--glass-1); font-size: 11px; }
 .connection-card--ready { color: var(--ok); border-color: rgba(63,221,157,.22); background: rgba(63,221,157,.055); }
+.claude-connect { display: flex; flex-direction: column; gap: 9px; padding: 12px; border: 1px solid rgba(130,175,255,.3); border-radius: 11px; background: var(--glass-1); }
+.claude-connect-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; }
+.claude-connect p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.claude-connect-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.claude-connect-code { display: flex; gap: 6px; }
+.claude-connect-code input { flex: 1; min-width: 0; }
+.claude-connect .alert { margin-bottom: 0; }
 .interview-prep .field { margin: 0; }
 .interview-prep textarea { width: 100%; resize: vertical; min-height: 70px; line-height: 1.5; }
 .interview-prep input { min-width: 0; padding: 9px 11px; color: var(--text); font: inherit; background: var(--glass-1); border: 1px solid var(--line-2); border-radius: 10px; }
